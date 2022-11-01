@@ -2,5 +2,5 @@
 
 By Bao Li*, Song Zhang, Bensheng Qiu, Zhenyu Liub, Jie Tian.
 
-![](./resources/nuhtc.png)
+![](./resources/nuhtc.jpg)
 This repo is the official implementation of NuHTC.
