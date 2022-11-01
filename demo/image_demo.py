@@ -8,8 +8,8 @@ from argparse import ArgumentParser
 from mmcv import Config
 from mmdet.apis import async_inference_detector, inference_detector, show_result_pyplot
 
-from ssod.apis.inference import init_detector, save_result
-from ssod.utils import patch_config
+from nuhtc.apis.inference import init_detector, save_result
+from nuhtc.utils import patch_config
 
 
 def parse_args():
