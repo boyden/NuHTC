@@ -4,3 +4,6 @@ By Bao Li*, Zhenyu Liu, Song Zhang, Xiangyu Liu, Jiangang Liu, Bensheng Qiu, Jie
 
 ![](./resources/nuhtc.jpg)
 This repo is the official implementation of NuHTC.
+
+## Overlaid Segmentation and Classification Prediction
+![](./resources/instance_seg.gif)
