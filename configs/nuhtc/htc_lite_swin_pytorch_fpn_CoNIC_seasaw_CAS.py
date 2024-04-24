@@ -1,18 +1,4 @@
-'''
-Example:
-    >>> from mmdet.models import ResNet
-    >>> import torch
-    >>> self = ResNet(depth=18)
-    >>> self.eval()
-    >>> inputs = torch.rand(1, 3, 32, 32)
-    >>> level_outputs = self.forward(inputs)
-    >>> for level_out in level_outputs:
-    ...     print(tuple(level_out.shape))
-    (1, 64, 8, 8)
-    (1, 128, 4, 4)
-    (1, 256, 2, 2)
-    (1, 512, 1, 1)
-'''
+
 # CUDA_VISIBLE_DEVICES=1 nohup python tools/train.py configs/nuhtc/htc_lite_swin_pytorch_fpn_CoNIC_seasaw_CAS.py > WSI_Seg_CoNIC_HTC_lite_swin_fold1.log 2>&1 &
 # ps aux | grep WSI_Seg_HTC_swin_PanNuke.py | awk '{print $2}' | xargs kill -9
 fold = 1
@@ -360,7 +346,7 @@ data = dict(
         type='CASDataset',
         dataset=dict(
             type=f'{dataset_name}CocoDataset',
-            ann_file=f'{basedir}/{dataset_name}_annt_RLE_fold{(fold-1)%3+1}{(fold)%3+1}.json',
+            ann_file=f'{basedir}/{dataset_name}_annt_RLE_fold{(fold-1)%3+1}.json',
             img_prefix=f'{basedir}/Images/',
             seg_prefix=f'{basedir}/Images_seg',
             pipeline=train_pipeline,
@@ -418,7 +404,7 @@ custom_hooks = [
     dict(type='NumClassCheckHook'),
     dict(type='WeightSummary'),
     dict(type='Mask_Vis_Hook', interval=2000),
-    dict(type='LinearMomentumEMAHook', momentum=0.0002, warm_up=100),
+    dict(type='LinearMomentumEMAHook', momentum=0.0002, warm_up=100, priority=40),
     dict(type='FineTune', iter=15000),
 ]
 

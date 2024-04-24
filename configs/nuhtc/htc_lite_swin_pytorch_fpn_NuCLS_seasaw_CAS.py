@@ -1,18 +1,4 @@
-'''
-Example:
-    >>> from mmdet.models import ResNet
-    >>> import torch
-    >>> self = ResNet(depth=18)
-    >>> self.eval()
-    >>> inputs = torch.rand(1, 3, 32, 32)
-    >>> level_outputs = self.forward(inputs)
-    >>> for level_out in level_outputs:
-    ...     print(tuple(level_out.shape))
-    (1, 64, 8, 8)
-    (1, 128, 4, 4)
-    (1, 256, 2, 2)
-    (1, 512, 1, 1)
-'''
+
 # CUDA_VISIBLE_DEVICES=1 nohup python WSI_Seg_HTC_swin_NuCLS.py > WSI_Seg_NuCLS_HTC_swin.log 2>&1 &
 # ps aux | grep WSI_Seg_HTC_swin_NuCLS.py | awk '{print $2}' | xargs kill -9
 # CUDA_VISIBLE_DEVICES=1 python tools/test.py configs/nuhtc/htc_swin_pytorch_fpn_NuCLS_seasaw_CAS.py work_dirs/htc_swin_pytorch_Swin_FPN_AttenROI_CoNIC_full_epoch_400_20220211_222229/latest.pth --eval bbox --eval-options save=True --out=results/CoNIC_res.pkl
@@ -414,7 +400,7 @@ custom_hooks = [
     dict(type='NumClassCheckHook'),
     dict(type='WeightSummary'),
     dict(type='Mask_Vis_Hook', interval=2000),
-    dict(type='LinearMomentumEMAHook', momentum=0.001, warm_up=100),
+    dict(type='LinearMomentumEMAHook', momentum=0.001, warm_up=100, priority=40),
     dict(type='FineTune', iter=15000),
 ]
 

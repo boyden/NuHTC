@@ -360,7 +360,7 @@ data = dict(
         type='CASDataset',
         dataset=dict(
             type='PanNukeCocoDataset',
-            ann_file=f'{basedir}/PanNuke_annt_RLE_fold{(fold-1)%3+1}{(fold)%3+1}.json',
+            ann_file=f'{basedir}/PanNuke_annt_RLE_fold{(fold-1)%3+1}.json',
             img_prefix=f'{basedir}/rgb/',
             seg_prefix=f'{basedir}/rgb_seg',
             pipeline=train_pipeline,
@@ -418,7 +418,7 @@ custom_hooks = [
     dict(type='NumClassCheckHook'),
     dict(type='WeightSummary'),
     dict(type='Mask_Vis_Hook', interval=2000),
-    dict(type='LinearMomentumEMAHook', momentum=0.0002, warm_up=100),
+    dict(type='LinearMomentumEMAHook', momentum=0.0002, warm_up=100, priority=40),
     dict(type='FineTune', iter=15000),
 ]
 

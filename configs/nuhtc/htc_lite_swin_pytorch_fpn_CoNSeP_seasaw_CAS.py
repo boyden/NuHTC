@@ -421,6 +421,6 @@ custom_hooks = [
     dict(type='NumClassCheckHook'),
     dict(type='WeightSummary'),
     dict(type='Mask_Vis_Hook', interval=2000),
-    dict(type='LinearMomentumEMAHook', momentum=0.0002, warm_up=100),
+    dict(type='LinearMomentumEMAHook', momentum=0.0002, warm_up=100, priority=40),
     dict(type='FineTune', iter=15000),
 ]

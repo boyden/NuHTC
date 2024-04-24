@@ -464,21 +464,22 @@ def main():
                 labels[mask_id] = labels[mask_id][select_id]
                 fg_scores[mask_id] = fg_scores[mask_id][select_id]
                 if args.mode == 'qupath' or args.mode == 'all':
+                    # QuPath 0.4.4
                     geojson = [{
                         "type": "Feature",
                         "geometry": {
-                          "type": "Polygon",
-                          "coordinates": seg_mask[mask_id][i].tolist()
+                            "type": "Polygon",
+                            "coordinates": seg_mask[mask_id][i].tolist()
                         },
                         "properties": {
-                          "object_type": "annotation",
-                          "color": model.inst_rng_colors[labels[mask_id][i]],
-                          "label": int(labels[mask_id][i]),
-                          "score": float(fg_scores[mask_id][i]),
-                          "classification": {
-                            "name": model.CLASSES[labels[mask_id][i]],
-                          },
-                          "isLocked": False
+                            "objectType": "annotation",
+                            "label": int(labels[mask_id][i]),
+                            "score": float(fg_scores[mask_id][i]),
+                            "classification": {
+                                "name": model.CLASSES[labels[mask_id][i]],
+                                "color": model.inst_rng_colors[labels[mask_id][i]],
+                            },
+                            "isLocked": False
                         }
                     } for i in range(len(seg_mask[mask_id]))]
                     geojson_li += geojson
@@ -510,7 +511,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    # convert qupath geojson to dsa_json
-    # dsa qupath-polygon WSI/infer/FUSCCTNBC466/FUSCCTNBC466.geojson --output_dir . --annotation_name quppath --image_filename FUSCCTNBC466.svs --classes_to_include T,I,C,D,E --line_colors '{"T": "rgb(255, 0, 0)", "I": "rgb(0, 255, 0)", "C": "rgb(0, 0, 255)", "D": "rgb(255, 255, 0)", "E": "rgb(255, 0, 255)"}' --fill_colors '{"T": "rgba(255, 0, 0, 0)", "I": "rgba(0, 255, 0, 0)", "C": "rgba(0, 0, 255, 0)", "D": "rgba(255, 255, 0, 0)", "E": "rgba(255, 0, 255, 0)"}'
-    # upload annt
-    # dsa_upload http://172.18.20.8:8080/api/v1 --collection_name FUDAN --image_filename FUSCCTNBC466.ndpi --annotation_filepath ./quppath_FUSCCTNBC466_partial.json
