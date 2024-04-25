@@ -1,6 +1,6 @@
 # NuHTC: A Hybrid Task Cascade for Nuclei Instance Segmentation and Classification
 
->  [Bao Li](https://boyden.github.io), Zhenyu Liu, Song Zhang, Xiangyu Liu, Jiangang Liu, Bensheng Qiu, Jie Tian.
+>  [Bao Li](https://boyden.github.io), et al.
 
 ![](./resources/nuhtc.jpg)
 This repo is the official implementation of NuHTC.
