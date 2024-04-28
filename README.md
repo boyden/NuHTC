@@ -17,9 +17,9 @@ Setup the python environment
 conda create -n nuhtc -y python=3.6 
 conda activate nuhtc
 conda install -y pytorch==1.9.0 torchvision==0.10.0 torchaudio==0.9.0 cudatoolkit=11.1 -c pytorch -c conda-forge
-pip install mmcv-full==1.5.0 -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.9/index.html
-python -m pip install histomicstk==1.1.0 --find-links https://girder.github.io/large_image_wheels
 pip install -r requirements.txt
+pip install mmcv-full==1.5.0 -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.9/index.html
+python -m pip install histomicstk==1.1.0 --find-links https://girder.github.io/large_image_wheels -i https://pypi.org/simple
 ```
 ## 👉 Train
 
