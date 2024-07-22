@@ -10,7 +10,7 @@ The demo may take around 10s to load.
 ![](./resources/instance_demo.gif)
 
 ## 👉 Setup Environment
-Setup the python environment
+Setup the Python environment
 
 ```shell script
 # Note, please follow the env.
@@ -34,11 +34,11 @@ CUDA_VISIBLE_DEVICES=0 python ./tools/infer.py demo/imgs models/htc_lite_PanNuke
 ```
 
 ## 🚀 Segment the Whole Slide Image
-Segment for the WSI with support output version: qupath, sql, dsa. Do not automatic support various magnification. (Default: 40x).
+Segment for the WSI with support output version: qupath, sql, dsa. Do not automatically support various magnifications. (Default: 40x).
 ```shell script
 CUDA_VISIBLE_DEVICES=0 python tools/infer_wsi.py demo/wsi configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py models/pannuke.pth --out demo/wsi_res --patch --seg --stitch --space 256 --step_size 192 --target_spacing 0.25 --margin 2 --min_area 10 --save_dir demo/wsi_infer  --mode qupath --no_auto_skip
 ```
 
 ## 🗓️ Ongoing
-- [ ] Support python 3.9 or higher
-- [ ] Merge overlap nuclei when segment the WSI
+- [ ] Support Python 3.9 or higher
+- [ ] Merge overlap nuclei when segmenting the WSI
