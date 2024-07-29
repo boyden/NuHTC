@@ -91,12 +91,12 @@ for fold in range(3):
 ```
 
 ## 👉 Train
-
-Note, recent update of Nvidia driver version will lead to `UnicodeDecodeError: 'utf-8' codec can't decode byte 0xf8 in position 0: invalid start byte` in init wandb package. If your nvidia driver version is greater than `552.44`, please downgrade to the `Nvidia 552.44 studio driver` for successfully training the models. For more details, please refer to [wandb issue](https://github.com/wandb/wandb/issues/7683).
 ```shell script
 # Please modify the `fold = 1` content to change the fold.
 CUDA_VISIBLE_DEVICES=0 python tools/train.py configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py
 ```
+
+Note, recent update (~May 2024, driver version 555.85, 555.99, 556.12) of Nvidia driver may lead to `UnicodeDecodeError: 'utf-8' codec can't decode byte 0xf8 in position 0: invalid start byte` in init wandb package. If your nvidia driver version is greater than `552.44`, please downgrade to the `Nvidia 552.44 studio driver` or update to the version greater than `560.70` for successfully training the models. For more details, please refer to [wandb issue](https://github.com/wandb/wandb/issues/7683).
 
 ## 👉 Test
 ``` shell script
