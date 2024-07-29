@@ -14,7 +14,7 @@ Example:
     (1, 512, 1, 1)
 '''
 # CUDA_VISIBLE_DEVICES=1 nohup python tools/train.py configs/nuhtc/htc_lite_swin_pytorch_fpn_CoNSeP_seasaw_CAS.py > WSI_Seg_CoNSeP_HTC_lite_swin.log 2>&1 &
-# ps aux | grep WSI_Seg_HTC_swin_CoNSeP.py | awk '{print $2}' | xargs kill -9
+# ps aux | grep htc_lite_swin_pytorch_fpn_CoNSeP_seasaw_CAS.py | awk '{print $2}' | xargs kill -9
 thres = 0.965926
 num_classes = 4
 scale_factor = 2.0
@@ -33,8 +33,8 @@ neck_type = 'FPN'
 log_note = f'{neck_type}_AttenROI_thres_{int(thres*100)}_base_aug_cas'
 log_name = f'htc_lite_swin_pytorch_seasaw_{log_note}_{dataset_name}_full_epoch_{max_epochs}'
 work_dir = f'./work_dirs/{log_name}'
-data_dir = '/home/bao/dataset'
-basedir = f'{data_dir}/NuSeg/{dataset_name}'
+data_dir = './datasets'
+basedir = f'{data_dir}/{dataset_name}'
 pretrained = 'https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_tiny_patch4_window7_224.pth'
 by_epoch = True
 seg_ignore_label = 0

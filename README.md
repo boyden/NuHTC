@@ -50,12 +50,49 @@ NuHTC
 ├── ...
 ```
 For the coco format annotation, please download the `coco` folder json file from [Google Drive](https://drive.google.com/drive/folders/1MezZrVwx7S6MNYkpMO5ja2D6KcZkRvYo?usp=sharing).
-
-```shell script
-CUDA_VISIBLE_DEVICES=0 python tools/train.py configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py
 ```
+NuHTC
+├── ...
+├── coco
+│   ├── PanNuke
+│   │   ├── PanNuke_annt_RLE_fold1.json
+│   │   ├── PanNuke_annt_RLE_fold2.json
+│   │   ├── PanNuke_annt_RLE_fold3.json
+├── ...
+```
+Then generating `png` files for training and test.
+```python
+import os
+import numpy as np
+from PIL import Image
+from tqdm import tqdm
+
+basedir = './datasets/PanNuke'
+for fold in range(3):
+    print(f'Preprocessing images: fold{fold+1}')
+    imgdir = f'{basedir}/images/fold{fold+1}'
+    img_data = np.load(f'{imgdir}/images.npy', mmap_mode='r')
+    for i in tqdm(range(img_data.shape[0])):
+        img = Image.fromarray(img_data[i].astype(np.uint8))
+        os.makedirs(f'{basedir}/rgb', exist_ok=True)
+        if not os.path.exists(f'{basedir}/rgb/{i+1}.png'):
+            img.convert('RGB').save(f'{basedir}/rgb/fold{fold+1}_{i+1}.png')
+
+for fold in range(3):
+    print(f'Preprocessing masks: fold{fold+1}')
+    imgdir = f'{basedir}/masks/fold{fold+1}'
+    img_data = np.load(f'{imgdir}/masks.npy', mmap_mode='r')
+    for i in tqdm(range(img_data.shape[0])):
+        img = 1 - img_data[i, :, :, 5]
+        img = Image.fromarray(img.astype(np.uint8))
+        os.makedirs(f'{basedir}/rgb_seg', exist_ok=True)
+        if not os.path.exists(f'{basedir}/rgb_seg/{i+1}.png'):
+            img.save(f'{basedir}/rgb_seg/fold{fold+1}_{i+1}.png')
+```
+
 ## 👉 Train
 
+Note, recent update of Nvidia driver version will lead to `UnicodeDecodeError: 'utf-8' codec can't decode byte 0xf8 in position 0: invalid start byte` in init wandb package. If your nvidia driver version is greater than `552.44`, please downgrade to the `Nvidia 552.44 studio driver` for successfully training the models. For more details, please refer to [wandb issue](https://github.com/wandb/wandb/issues/7683).
 ```shell script
 CUDA_VISIBLE_DEVICES=0 python tools/train.py configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py
 ```
@@ -63,7 +100,7 @@ CUDA_VISIBLE_DEVICES=0 python tools/train.py configs/nuhtc/htc_lite_swin_pytorch
 Our trained checkpoint can be downloaded from the `models` folder in the [Google Drive](https://drive.google.com/drive/folders/1MezZrVwx7S6MNYkpMO5ja2D6KcZkRvYo?usp=sharing).
 ```shell script
 # Segment image by image
-CUDA_VISIBLE_DEVICES=0 python ./tools/infer.py demo/imgs models/htc_lite_PanNuke_infer.py models/pannuke.pth --out demo/imgs_infer
+CUDA_VISIBLE_DEVICES=0 python ./tools/infer.py demo/imgs configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py models/pannuke.pth --out demo/imgs_infer
 ```
 Note: Due to different implementation of calculating bPQ and mPQ, the implementation of PQ in our codes are just reference. For reproduced results, please refer to PanNuke implementation https://github.com/TissueImageAnalytics/PanNuke-metrics.
 

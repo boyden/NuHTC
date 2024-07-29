@@ -33,7 +33,7 @@ log_note = f'{neck_type}_AttenROI_thres_{int(thres*100)}_base_aug_cas'
 log_name = f'htc_lite_swin_pytorch_seasaw_{log_note}_{dataset_name}_full_epoch_{max_epochs}_fold{fold}'
 work_dir = f'./work_dirs/{log_name}'
 # PATH that need to be replaced
-data_dir = './dataset'
+data_dir = './datasets'
 basedir = f'{data_dir}/{dataset_name}'
 pretrained = 'https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_tiny_patch4_window7_224.pth'
 load_from = None

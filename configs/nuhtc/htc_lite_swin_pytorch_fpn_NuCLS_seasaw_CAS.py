@@ -1,7 +1,6 @@
 
 # CUDA_VISIBLE_DEVICES=1 nohup python WSI_Seg_HTC_swin_NuCLS.py > WSI_Seg_NuCLS_HTC_swin.log 2>&1 &
 # ps aux | grep WSI_Seg_HTC_swin_NuCLS.py | awk '{print $2}' | xargs kill -9
-# CUDA_VISIBLE_DEVICES=1 python tools/test.py configs/nuhtc/htc_swin_pytorch_fpn_NuCLS_seasaw_CAS.py work_dirs/htc_swin_pytorch_Swin_FPN_AttenROI_CoNIC_full_epoch_400_20220211_222229/latest.pth --eval bbox --eval-options save=True --out=results/CoNIC_res.pkl
 fold = 1
 thres = 0.965926
 start_level = 2
@@ -22,8 +21,8 @@ neck_type = 'FPN'
 log_note = f'{neck_type}_AttenROI_lvl_{start_level}_thres_{int(thres*100)}_base_aug_cas_nocrop'
 log_name = f'htc_lite_swin_pytorch_seasaw_{log_note}_{dataset_name}_full_epoch_{max_epochs}_fold{fold}'
 work_dir = f'./work_dirs/{log_name}'
-data_dir = f'/home/bao/dataset'
-basedir = f'{data_dir}/NuSeg/{dataset_name}'
+data_dir = './datasets'
+basedir = f'{data_dir}/{dataset_name}'
 pretrained = 'https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_tiny_patch4_window7_224.pth'
 by_epoch = True
 seg_ignore_label = 0
