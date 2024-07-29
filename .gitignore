@@ -5,6 +5,7 @@
 .history
 .DS_Store
 #python
+__pycache__
 __pycache__/
 */__pycache__
 *.egg-info
@@ -18,6 +19,7 @@ thirdparty/
 wandb
 data
 data/
+/datasets
 results
 results/
 models
@@ -46,3 +48,6 @@ launch.py
 *.sqlite
 
 .pytest*
+
+coco
+coco/

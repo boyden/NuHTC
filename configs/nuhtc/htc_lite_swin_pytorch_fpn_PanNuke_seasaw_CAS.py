@@ -33,8 +33,8 @@ log_note = f'{neck_type}_AttenROI_thres_{int(thres*100)}_base_aug_cas'
 log_name = f'htc_lite_swin_pytorch_seasaw_{log_note}_{dataset_name}_full_epoch_{max_epochs}_fold{fold}'
 work_dir = f'./work_dirs/{log_name}'
 # PATH that need to be replaced
-data_dir = '/home/bao/dataset'
-basedir = f'{data_dir}/NuSeg/{dataset_name}'
+data_dir = './dataset'
+basedir = f'{data_dir}/{dataset_name}'
 pretrained = 'https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_tiny_patch4_window7_224.pth'
 load_from = None
 resume_from = None
@@ -360,7 +360,7 @@ data = dict(
         type='CASDataset',
         dataset=dict(
             type='PanNukeCocoDataset',
-            ann_file=f'{basedir}/PanNuke_annt_RLE_fold{(fold-1)%3+1}.json',
+            ann_file=f'./coco/PanNuke/PanNuke_annt_RLE_fold{(fold-1)%3+1}.json',
             img_prefix=f'{basedir}/rgb/',
             seg_prefix=f'{basedir}/rgb_seg',
             pipeline=train_pipeline,
@@ -368,14 +368,14 @@ data = dict(
     ),
     val=dict(
         type='PanNukeCocoDataset',
-        ann_file=f'{basedir}/PanNuke_annt_RLE_fold{(fold+4)%3+1}.json',
+        ann_file=f'./coco/PanNuke/PanNuke_annt_RLE_fold{(fold+4)%3+1}.json',
         img_prefix=f'{basedir}/rgb/',
         seg_prefix=f'{basedir}/rgb_seg',
         pipeline=test_pipeline,
     ),
     test=dict(
         type='PanNukeCocoDataset',
-        ann_file=f'{basedir}/PanNuke_annt_RLE_fold{(fold+4)%3+1}.json',
+        ann_file=f'./coco/PanNuke/PanNuke_annt_RLE_fold{(fold+4)%3+1}.json',
         img_prefix=f'{basedir}/rgb/',
         seg_prefix=f'{basedir}/rgb_seg',
         pipeline=test_pipeline,
