@@ -117,7 +117,7 @@ python tools/analysis_tools/pannuke/compute_stats.py --true_path=datasets/PanNuk
 Our trained checkpoint can be downloaded from the `models` folder in the [Google Drive](https://drive.google.com/drive/folders/1MezZrVwx7S6MNYkpMO5ja2D6KcZkRvYo?usp=sharing).
 ```shell script
 # Segment image by image
-CUDA_VISIBLE_DEVICES=0 python ./tools/infer.py demo/imgs configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py models/pannuke.pth --out demo/imgs_infer
+CUDA_VISIBLE_DEVICES=0 python tools/infer.py demo/imgs configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py models/pannuke.pth --out demo/imgs_infer
 ```
 
 ## 🚀 Segment the Whole Slide Image
