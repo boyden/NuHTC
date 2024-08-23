@@ -75,7 +75,7 @@ for fold in range(3):
     for i in tqdm(range(img_data.shape[0])):
         img = Image.fromarray(img_data[i].astype(np.uint8))
         os.makedirs(f'{basedir}/rgb', exist_ok=True)
-        if not os.path.exists(f'{basedir}/rgb/{i+1}.png'):
+        if not os.path.exists(f'{basedir}/rgb/fold{fold+1}_{i+1}.png'):
             img.convert('RGB').save(f'{basedir}/rgb/fold{fold+1}_{i+1}.png')
 
 for fold in range(3):
@@ -86,7 +86,7 @@ for fold in range(3):
         img = 1 - img_data[i, :, :, 5]
         img = Image.fromarray(img.astype(np.uint8))
         os.makedirs(f'{basedir}/rgb_seg', exist_ok=True)
-        if not os.path.exists(f'{basedir}/rgb_seg/{i+1}.png'):
+        if not os.path.exists(f'{basedir}/rgb_seg/fold{fold+1}_{i+1}.png'):
             img.save(f'{basedir}/rgb_seg/fold{fold+1}_{i+1}.png')
 ```
 
