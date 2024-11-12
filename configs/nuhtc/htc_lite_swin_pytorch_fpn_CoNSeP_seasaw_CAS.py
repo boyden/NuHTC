@@ -362,13 +362,6 @@ data = dict(
             pipeline=train_pipeline,
         )
     ),
-    val=dict(
-        type=dataset,
-        ann_file=f'{basedir}/test_annt_RLE_256_93.json',
-        img_prefix=f'{basedir}/Test/256_93',
-        seg_prefix=f'{basedir}/Test/256_93_seg',
-        pipeline=test_pipeline,
-    ),
     test=dict(
         type=dataset,
         ann_file=f'{basedir}/test_annt_RLE_256_93.json',

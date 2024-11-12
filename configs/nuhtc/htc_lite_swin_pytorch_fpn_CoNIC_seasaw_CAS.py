@@ -352,13 +352,6 @@ data = dict(
             pipeline=train_pipeline,
         )
     ),
-    val=dict(
-        type=f'{dataset_name}CocoDataset',
-        ann_file=f'{basedir}/{dataset_name}_annt_RLE_fold{(fold+4)%3+1}.json',
-        img_prefix=f'{basedir}/Images/',
-        seg_prefix=f'{basedir}/Images_seg',
-        pipeline=test_pipeline,
-    ),
     test=dict(
         type=f'{dataset_name}CocoDataset',
         ann_file=f'{basedir}/{dataset_name}_annt_RLE_fold{(fold+4)%3+1}.json',

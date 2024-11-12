@@ -366,13 +366,6 @@ data = dict(
             pipeline=train_pipeline,
         )
     ),
-    # val=dict(
-    #     type='PanNukeCocoDataset',
-    #     ann_file=f'./coco/PanNuke/PanNuke_annt_RLE_fold{(fold+4)%3+1}.json',
-    #     img_prefix=f'{basedir}/rgb/',
-    #     seg_prefix=f'{basedir}/rgb_seg',
-    #     pipeline=test_pipeline,
-    # ),
     test=dict(
         type='PanNukeCocoDataset',
         ann_file=f'./coco/PanNuke/PanNuke_annt_RLE_fold{(fold+4)%3+1}.json',
