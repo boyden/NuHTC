@@ -4,6 +4,7 @@
 .idea
 .history
 .DS_Store
+pyrightconfig.json
 #python
 __pycache__
 __pycache__/
@@ -24,6 +25,8 @@ results
 results/
 models
 models/
+logs
+logs/
 *.pkl
 *.pkl.json
 *.log.json
@@ -41,6 +44,7 @@ cp.py
 *.pth
 *.py~
 *.sh~
+*.sh
 launch.py
 
 #nvidia
@@ -48,6 +52,7 @@ launch.py
 *.sqlite
 
 .pytest*
+*.slurm
 
 coco
 coco/

@@ -15,7 +15,7 @@ Example:
 '''
 # CUDA_VISIBLE_DEVICES=1 nohup python tools/train.py configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py > WSI_Seg_PanNuke_HTC_lite_swin_fold1.log 2>&1 &
 # ps aux | grep WSI_Seg_HTC_swin_PanNuke.py | awk '{print $2}' | xargs kill -9
-fold = 1
+fold = 2
 thres = 0.965926
 num_classes = 5
 scale_factor = 2.0
@@ -366,13 +366,13 @@ data = dict(
             pipeline=train_pipeline,
         )
     ),
-    val=dict(
-        type='PanNukeCocoDataset',
-        ann_file=f'./coco/PanNuke/PanNuke_annt_RLE_fold{(fold+4)%3+1}.json',
-        img_prefix=f'{basedir}/rgb/',
-        seg_prefix=f'{basedir}/rgb_seg',
-        pipeline=test_pipeline,
-    ),
+    # val=dict(
+    #     type='PanNukeCocoDataset',
+    #     ann_file=f'./coco/PanNuke/PanNuke_annt_RLE_fold{(fold+4)%3+1}.json',
+    #     img_prefix=f'{basedir}/rgb/',
+    #     seg_prefix=f'{basedir}/rgb_seg',
+    #     pipeline=test_pipeline,
+    # ),
     test=dict(
         type='PanNukeCocoDataset',
         ann_file=f'./coco/PanNuke/PanNuke_annt_RLE_fold{(fold+4)%3+1}.json',

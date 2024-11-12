@@ -40,15 +40,15 @@ def main(args):
     conic_path = f'{eval_path}/conic_stats.csv'
     pannuke_path = f'{eval_path}/tissue_stats.csv'
 
-    conic_metric = pd.read_csv(conic_path, index_col=0)
+    # conic_metric = pd.read_csv(conic_path, index_col=0)
     pannuke_metric = pd.read_csv(pannuke_path, index_col=0)
-    conic_dict = conic_metric.iloc[0].to_dict()
+    # conic_dict = conic_metric.iloc[0].to_dict()
     pannuek_dict = pannuke_metric.iloc[-1].to_dict()
-    aji, dice = conic_dict['aji'], conic_dict['dice']
+    # aji, dice = conic_dict['aji'], conic_dict['dice']
     mPQ, PQ = pannuek_dict['PQ'], pannuek_dict['PQ bin']
     all_metrics = {
-        'aji': [aji],
-        'dice': [dice],
+        # 'aji': [aji],
+        # 'dice': [dice],
         'PQ': [PQ],
         'mPQ': [mPQ]
     }
@@ -63,14 +63,14 @@ def main(args):
 if __name__ == '__main__':
     args = docopt.docopt(__doc__, version='PanNuke Evaluation v1.0')
     main(args)
-    basedir = '/home/bao/code/SoftTeacher'
+    basedir = '/home/bal753/NuHTC/work_dirs'
     if not args['--exp']:
         exp_name = os.path.basename(args['--path'])[:-1]
     nuclei_stat_li = []
     mpq_li = []
     bpq_li = []
     for fold in range(1, 4):
-        nuclei_stat = pd.read_csv(f'{basedir}/results/{exp_name}{fold}/tissue_stats.csv')
+        nuclei_stat = pd.read_csv(f'{basedir}/{exp_name}{fold}/tissue_stats.csv')
         nuclei_stat = nuclei_stat.drop(['Unnamed: 0'], axis=1)
         bpq_li.append(nuclei_stat.loc[19, ['PQ bin']].values[0])
         mpq_li.append(nuclei_stat.loc[19, ['PQ']].values[0])
@@ -85,7 +85,7 @@ if __name__ == '__main__':
     nuclei_stat_li = []
     mpq_li = []
     for fold in range(1, 4):
-        nuclei_stat = pd.read_csv(f'{basedir}/results/{exp_name}{fold}/class_stats.csv')
+        nuclei_stat = pd.read_csv(f'{basedir}/{exp_name}{fold}/class_stats.csv')
         nuclei_stat = nuclei_stat.drop(['Unnamed: 0'], axis=1)
         nuclei_stat_li.append(nuclei_stat)
 
