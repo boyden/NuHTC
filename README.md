@@ -33,20 +33,20 @@ NuHTC
 │   │   ├── images
 │   │   │   ├── fold1
 │   │   │   │   ├── images.npy
-│   │   │   │   ├── types.npy
 │   │   │   ├── fold2
 │   │   │   │   ├── images.npy
-│   │   │   │   ├── types.npy
 │   │   │   ├── fold3
 │   │   │   │   ├── images.npy
-│   │   │   │   ├── types.npy
 │   │   ├── masks
 │   │   │   ├── fold1
 │   │   │   │   ├── masks.npy
+│   │   │   │   ├── types.npy
 │   │   │   ├── fold2
 │   │   │   │   ├── masks.npy
+│   │   │   │   ├── types.npy
 │   │   │   ├── fold3
 │   │   │   │   ├── masks.npy
+│   │   │   │   ├── types.npy
 ├── ...
 ```
 For the coco format annotation, please download the `coco` folder json file from [Google Drive](https://drive.google.com/drive/folders/1MezZrVwx7S6MNYkpMO5ja2D6KcZkRvYo?usp=sharing)
