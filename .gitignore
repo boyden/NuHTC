@@ -25,6 +25,8 @@ results
 results/
 models
 models/
+pretrain
+pretrain/
 logs
 logs/
 *.pkl
