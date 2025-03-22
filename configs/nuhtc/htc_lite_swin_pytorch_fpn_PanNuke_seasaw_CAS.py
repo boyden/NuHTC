@@ -1,6 +1,6 @@
 # CUDA_VISIBLE_DEVICES=1 nohup python tools/train.py configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py > WSI_Seg_PanNuke_HTC_lite_swin_fold1.log 2>&1 &
 # ps aux | grep WSI_Seg_HTC_swin_PanNuke.py | awk '{print $2}' | xargs kill -9
-fold = 2
+fold = 1
 thres = 0.965926
 num_classes = 5
 scale_factor = 2.0
