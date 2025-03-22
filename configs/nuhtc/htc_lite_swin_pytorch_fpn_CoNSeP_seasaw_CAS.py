@@ -18,7 +18,7 @@ Example:
 thres = 0.965926
 num_classes = 4
 scale_factor = 2.0
-max_epochs = 200
+max_epochs = 100
 img_norm_cfg = dict(mean=[123.675, 116.28, 103.53],  std=[58.395, 57.12, 57.375], to_rgb=True)
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
@@ -388,7 +388,7 @@ lr_config = dict(
     warmup='linear',
     warmup_iters=1000,
     warmup_ratio=0.001,
-    step=[60, 160])
+    step=[30, 80])
 runner = dict(type='EpochBasedRunner', max_epochs=max_epochs)
 checkpoint_config = dict(interval=10, by_epoch=by_epoch, max_keep_ckpts=20)
 log_config = dict(
