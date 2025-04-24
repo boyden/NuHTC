@@ -1,5 +1,3 @@
-# Copyright (c) OpenMMLab. All rights reserved.
-# Modified from thirdparty/mmdetection/demo/image_demo.py
 import asyncio
 import glob, sys, os, time, cv2, json
 import mmcv
