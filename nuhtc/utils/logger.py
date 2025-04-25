@@ -30,7 +30,7 @@ def get_root_logger(log_file=None, log_level=logging.INFO):
     Returns:
         :obj:`logging.Logger`: The obtained logger
     """
-    logger = get_logger(name="mmdet.ssod", log_file=log_file, log_level=log_level)
+    logger = get_logger(name="mmdet.nuhtc", log_file=log_file, log_level=log_level)
     logger.propagate = False
     return logger
 
@@ -42,7 +42,7 @@ def _find_caller():
         if os.path.join("utils", "logger.") not in code.co_filename:
             mod_name = frame.f_globals["__name__"]
             if mod_name == "__main__":
-                mod_name = r"ssod"
+                mod_name = r"nuhtc"
             return mod_name, (code.co_filename, frame.f_lineno, code.co_name)
         frame = frame.f_back
 
