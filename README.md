@@ -18,7 +18,7 @@ conda create -n nuhtc -y python=3.10
 conda activate nuhtc
 conda install pytorch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 pytorch-cuda=11.6 -c pytorch -c nvidia
 pip install -r requirements.txt
-pip install mmcv-full==1.7.2 -f  https://download.openmmlab.com/mmcv/dist/cu116/torch1.13/index.html
+pip install mmcv-full==1.7.2 -f https://download.openmmlab.com/mmcv/dist/cu116/torch1.13/index.html
 python -m pip install histomicstk==1.2.10 --find-links https://girder.github.io/large_image_wheels -i https://pypi.org/simple
 ```
 
@@ -129,5 +129,4 @@ CUDA_VISIBLE_DEVICES=0 python tools/infer_wsi.py demo/wsi configs/nuhtc/htc_lite
 ```
 
 ## 🗓️ Ongoing
-- [ ] Support Python 3.9 or higher
 - [ ] Merge overlap nuclei when segmenting the WSI
