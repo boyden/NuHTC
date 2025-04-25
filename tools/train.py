@@ -13,6 +13,7 @@ sys.path.insert(0, f'{proj_path}/thirdparty/mmdetection')
 sys.path.insert(0, proj_path)
 import mmcv
 import torch
+
 from mmcv import Config, DictAction
 from mmcv.runner import get_dist_info, init_dist
 from mmcv.utils import get_git_hash
