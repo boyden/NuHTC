@@ -14,12 +14,12 @@ Setup the Python environment
 
 ```shell script
 # Note, please follow the env.
-conda create -n nuhtc -y python=3.6 
+conda create -n nuhtc -y python=3.10 
 conda activate nuhtc
-conda install -y pytorch==1.9.0 torchvision==0.10.0 torchaudio==0.9.0 cudatoolkit=11.1 -c pytorch -c conda-forge
+conda install pytorch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 pytorch-cuda=11.6 -c pytorch -c nvidia
 pip install -r requirements.txt
-pip install mmcv-full==1.5.0 -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.9/index.html
-python -m pip install histomicstk==1.1.0 --find-links https://girder.github.io/large_image_wheels -i https://pypi.org/simple
+pip install mmcv-full==1.7.2 -f  https://download.openmmlab.com/mmcv/dist/cu116/torch1.13/index.html
+python -m pip install histomicstk==1.2.10 --find-links https://girder.github.io/large_image_wheels -i https://pypi.org/simple
 ```
 
 ## 👉 Preporcessing data
