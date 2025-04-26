@@ -7,13 +7,17 @@ import colorsys
 import random
 import numpy as np
 import pandas as pd
+
+from PIL import Image
+from scipy import stats
 from pycocotools import coco
 from argparse import ArgumentParser
 from tqdm import tqdm
-from itertools import starmap
+
 proj_path = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 sys.path.insert(0, f'{proj_path}/thirdparty/mmdetection')
 sys.path.insert(0, proj_path)
+
 from torch.utils.data import DataLoader
 from mmcv import Config
 from mmdet.apis import async_inference_detector, inference_detector, show_result_pyplot
@@ -52,6 +56,32 @@ def mask2inst(inst_map):
 def contour_map(contour, coord):
     map_contour = contour + coord
     return map_contour
+
+def mask_nms(masks, pred_scores, thr=0.9, min_area=None):
+    """https://github.com/cocodataset/cocoapi/blob/8c9bcc3cf640524c4c20a9c40e89cb6a2f2fa0e9/common/maskApi.c#L98
+
+    Returns:
+        tuple: kept dets and indice.
+    """
+    if isinstance(masks[0], np.ndarray):
+        masks = [coco.maskUtils.encode(np.asfortranarray(mask)) for mask in masks]
+    sort_idx = np.argsort(pred_scores)[::-1]
+    mask_len = len(masks)
+    tmp_masks = np.array(masks)[sort_idx]
+    mask_iou = coco.maskUtils.iou(tmp_masks.tolist(), tmp_masks.tolist(), [0] * mask_len)
+
+    keep_idx = np.ones(mask_len, dtype=np.uint8)
+    for i in range(mask_len):
+        if not keep_idx[i]:
+            continue
+        for j in range(i + 1, mask_len):
+            if not keep_idx[j]:
+                continue
+            tmp_iou = mask_iou[i, j]
+            # tmp_iou = maskUtils.iou([tmp_masks[i]], [tmp_masks[j]], [0])[0][0]
+            if tmp_iou > thr:
+                keep_idx[j] = 0
+    return tmp_masks[keep_idx==1].tolist(), sort_idx[keep_idx==1]
 
 def stitching(file_path, wsi_object, downscale = 64):
     start = time.time()
@@ -301,6 +331,8 @@ def parse_args():
                         help='predefined profile of default segmentation and filter parameters (.csv)')
     parser.add_argument('--patch_level', type=int, default=0,
                         help='downsample level at which to patch')
+    parser.add_argument('--batch_size', type=int, default=32,
+                        help='batch size of images during inference')
     parser.add_argument('--process_list',  type = str, default=None,
                         help='name of list of images to process with parameters (.csv)')
     parser.add_argument('--slide_ext',  type = str, default='.svs',
@@ -314,6 +346,7 @@ def parse_args():
 
 def main():
     args = parse_args()
+    batch_size = args.batch_size
     patch_save_dir = os.path.join(args.save_dir, 'patches')
     mask_save_dir = os.path.join(args.save_dir, 'masks')
     stitch_save_dir = os.path.join(args.save_dir, 'stitches')
@@ -372,11 +405,17 @@ def main():
     cfg = patch_config(cfg)
     # build the model from a config file and a checkpoint file
     model = init_detector(cfg, args.checkpoint, device=args.device)
-    model.CLASSES = ('T', 'I', 'C', 'D', 'E')
+    MAIN_CLASSES = ('T', 'I', 'C', 'D', 'E')
+    model.CLASSES = MAIN_CLASSES
     model.inst_rng_colors = [[255, 0, 0],[0, 255, 0], [0, 0, 255], [255, 255, 0], [255, 0, 255]]
     model.inst_fillColor = ["rgba(255, 0, 0, 0)","rgba(0, 255, 0, 0)", "rgba(0, 0, 255, 0)", "rgba(255, 255, 0, 0)", "rgba(255, 0, 255, 0)"]
     model.inst_lineColor = ["rgb(255, 0, 0)","rgb(0, 255, 0)", "rgb(0, 0, 255)", "rgb(255, 255, 0)", "rgb(255, 0, 255)"]
     model.inst_rand_colors = random_colors(100)
+    main_cls_arr = []
+    for i in range(len(MAIN_CLASSES)):
+        cls_dict = {'id': i, 'name': MAIN_CLASSES[i]}
+        main_cls_arr.append(cls_dict)
+
     seg_times, patch_times = seg_and_patch(**directories, **parameters,
                                             patch_size=args.patch_size, step_size=args.step_size,
                                             seg=args.seg, use_default_params=False, save_mask=True,
@@ -407,28 +446,38 @@ def main():
         coords = []
         # os.makedirs(f'{args.save_dir}/{slide_id}/img', exist_ok=True)
         os.makedirs(f'{args.save_dir}/{slide_id}/infer', exist_ok=True)
-        infer_dataloader = DataLoader(dataset, batch_size=16, num_workers=8)
+        infer_dataloader = DataLoader(dataset, batch_size=batch_size, num_workers=8)
         geojson_li = []
+        pointjson_li = []
         dsajson_li = []
+        cocojson_li = []
+        img_li = []
+        annt_li = []
+        coords = []
+        nuclei_id = 0
+
         for idx, data in enumerate(tqdm(infer_dataloader)):
             img = data[0]
             img = [elem.numpy() for elem in img]
             coord = data[1].numpy()
-            # img.save(f'{args.save_dir}/{slide_id}/img/img_{coord[0]}_{coord[1]}.png')
             coords.append(coord)
             # img = glob.glob(f'{args.save_dir}/{slide_id}/img/img*.png')
             # img.sort()
             img_shape = img[0].shape
+            h, w, _ = img_shape
             result = inference_detector(model, img)
             seg_mask = [np.array(mmcv.concat_list(tmp_mask[1]), dtype=np.uint8)
                         for tmp_mask in result]
+            rle_mask = [[] for tmp_mask in result]
 
             bbox_results = [np.concatenate(tmp_res[0])[:, :4] for tmp_res in result]
             fg_scores = [np.concatenate(tmp_res[0])[:, 4] for tmp_res in result]
             labels = [np.concatenate([np.full(bbox.shape[0], i, dtype=np.int32)
                                       for i, bbox in enumerate(tmp_res[0])])
                       for tmp_res in result]
+
             for mask_id in range(len(seg_mask)):
+                annidx = idx * batch_size + mask_id
                 if len(seg_mask[mask_id]) == 0:
                     continue
                 if args.det:
@@ -449,6 +498,15 @@ def main():
                 fg_scores[mask_id] = fg_scores[mask_id][select_id]
                 if len(seg_mask[mask_id]) == 0:
                     continue
+                
+                # Mask NMS
+                tmp_masks, nms_idx = mask_nms(seg_mask[mask_id], fg_scores[mask_id], thr=0.05)
+                bbox_results[mask_id] = bbox_results[mask_id][nms_idx]
+                seg_mask[mask_id] = seg_mask[mask_id][nms_idx]
+                rle_mask[mask_id] = tmp_masks
+                labels[mask_id] = labels[mask_id][nms_idx]
+                fg_scores[mask_id] = fg_scores[mask_id][nms_idx]
+    
                 tmp_mask = [m for m in seg_mask[mask_id]]
                 seg_contour = list(map(mask2inst, tmp_mask))
                 select_id = np.array([True if len(con) >=3 else False for con in seg_contour])
@@ -456,8 +514,10 @@ def main():
                                for i in range(len(select_id))
                                if select_id[i]]
                 seg_mask[mask_id] = seg_contour
+
                 if len(seg_mask[mask_id]) == 0:
                     continue
+
                 bbox_results[mask_id] = bbox_results[mask_id][select_id] + np.tile(coord[mask_id], 2)
                 labels[mask_id] = labels[mask_id][select_id]
                 fg_scores[mask_id] = fg_scores[mask_id][select_id]
@@ -480,6 +540,24 @@ def main():
                             "isLocked": False
                         }
                     } for i in range(len(seg_mask[mask_id]))]
+                    pointjson = [{
+                        "type": "Feature",
+                        "geometry": {
+                            "type": "Point",
+                            "coordinates": [(bbox_results[mask_id][i][0]+bbox_results[mask_id][i][2])/2, (bbox_results[mask_id][i][1]+bbox_results[mask_id][i][3])/2]
+                        },
+                        "properties": {
+                            "objectType": "annotation",
+                            "label": int(labels[mask_id][i]),
+                            "score": float(fg_scores[mask_id][i]),
+                            "classification": {
+                                "name": model.CLASSES[labels[mask_id][i]],
+                                "color": model.inst_rng_colors[labels[mask_id][i]],
+                            },
+                            "isLocked": False
+                        }
+                    } for i in range(len(seg_mask[mask_id]))]
+                    pointjson_li += pointjson
                     geojson_li += geojson
                 if args.mode == 'dsa' or args.mode == 'all':
                     dsajson = [{
@@ -494,10 +572,48 @@ def main():
                         }
                     } for i in range(len(seg_mask[mask_id]))]
                     dsajson_li += dsajson
-            if idx % 1000 == 0 or idx == len(infer_dataloader) - 1:
+
+                if args.mode == 'coco' or args.mode == 'all':
+                    # for patch results (the coordinates represent the point location in each patch)
+                    img_dict = {
+                                'file_name': f'{annidx}.png',
+                                'height': h,
+                                'width': w,
+                                'id': annidx,
+                                'n_objects': len(seg_mask[mask_id]),
+                                'type': MAIN_CLASSES[stats.mode(labels[mask_id])[0]]
+                            }
+                    img_li.append(img_dict)
+
+                    for i in range(len(seg_mask[mask_id])):
+                        #TODO Convert coordinate to RLE
+                        rle_inst = rle_mask[mask_id][i]
+                        rle_inst['counts'] = rle_inst['counts'].decode('ascii')
+                        bbox = coco.maskUtils.toBbox(rle_inst).tolist()
+                        area = bbox[2]*bbox[3]
+                        annt_dict = {
+                            'bbox': bbox,
+                            'area': area,
+                            'image_id': annidx,
+                            'category_id': int(labels[mask_id][i]),
+                            'id': nuclei_id,
+                            'iscrowd': 0,
+                            'segmentation': rle_inst,
+                        }
+                        annt_li.append(annt_dict)
+                        nuclei_id += 1
+
+                    img_dir = f'{args.save_dir}/imgs/{slide_id}/{annidx}.png'
+                    if not os.path.exists(img_dir):
+                        os.makedirs(f'{args.save_dir}/imgs/{slide_id}', exist_ok=True)
+                        Image.fromarray(img[mask_id]).save(img_dir)
+
+            if idx % 5000 == 0 or idx == len(infer_dataloader) - 1:
                 if args.mode == 'qupath' or args.mode == 'all':
                     with open(f'{args.save_dir}/{slide_id}/{slide_id}.geojson', 'w') as f:
                         json.dump(geojson_li, f)
+                    with open(f'{args.save_dir}/{slide_id}/{slide_id}_point.geojson', 'w') as f:
+                        json.dump(pointjson_li, f)
                 if args.mode == 'dsa' or args.mode == 'all':
                     with open(f'{args.save_dir}/{slide_id}/{slide_id}_dsa.json', 'w') as f:
                         dsajson_file = {
@@ -506,6 +622,14 @@ def main():
                             'name': 'NuHTC'
                                         }
                         json.dump(dsajson_file, f)
+                if args.mode == 'coco' or args.mode == 'all':
+                    nuclei_annt_json = {
+                                        'images': img_li,
+                                        'annotations': annt_li,
+                                        'categories': main_cls_arr
+                                        }
+                    with open(f'{args.save_dir}/{slide_id}/coco_nuclei.json', 'w') as f:
+                        json.dump(nuclei_annt_json, f)
 
 if __name__ == '__main__':
     main()
