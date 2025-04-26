@@ -130,6 +130,8 @@ CUDA_VISIBLE_DEVICES=0 python tools/infer_wsi.py demo/wsi configs/nuhtc/htc_lite
 --save_dir demo/wsi_infer --mode qupath --no_auto_skip
 ```
 
+Our model is trained on patches of size `256×256` at 40X magnification. During inference, it maintains strong performance even when evaluated with a larger patch size of `512×512`. To run inference using `512×512` patches, please specify the arguments `--space 512 --step_size 448`.
+
 ## 🔬 Extract the Nuclei Feature
 After Please make sure you have installed the `histomicstk` correctly.
 ```shell script
@@ -144,7 +146,7 @@ python tools/nuclei_feat_extract.py demo/wsi_res
 # --min_num (int, default: 8)
 # Minimum number of nuclei required in a patch. Patches with fewer nuclei will be excluded.
 # --patch_size (int, default: 512)
-# Size (in pixels) of each image patch. Should match the expected input size (e.g. 512 for 40X resolution) used during inference.
+# Size (in pixels) of each image patch. Should match the expected input size (e.g. 256 or 512 for 40X resolution) used during inference.
 # --reverse (flag, default: False)
 # If specified, slide IDs will be processed in reverse order.
 ```
