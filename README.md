@@ -131,7 +131,9 @@ CUDA_VISIBLE_DEVICES=0 python tools/infer_wsi.py demo/wsi configs/nuhtc/htc_lite
 ```
 We provide a WSI example from TCGA (filename: `TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724.svs`), which includes the `GeoJSON` file for both nuclei points and contours. These can be easily dragged into, viewed, and edited by using [QuPath](https://qupath.github.io/). The WSI example can be downloaded from [Google Drive](https://drive.google.com/drive/folders/1UdCixl10kBxyKHUGOww4WIkdoFma-UIr?usp=drive_link).
 
-Our model is trained with patch size `256×256` at 40X magnification. During inference, it maintains strong performance even when evaluated with a larger patch size of `512×512`. To run inference using `512×512` patches, please specify the arguments `--space 512 --step_size 448`.
+The `dsa` is a format supported by [Digital Slide Archive](https://digitalslidearchive.github.io/digital_slide_archive/), a powerful containerized web-based platform for storing, managing, viewing, and analysing WSIs. If you are interested in using the DSA platform, please refer to its [deployment instructions](https://github.com/DigitalSlideArchive/digital_slide_archive/blob/master/devops/dsa/README.rst).
+
+Our model is trained with a patch size `256×256` at 40X magnification. During inference, it maintains strong performance even when evaluated with a larger patch size of `512×512`. To run inference using `512×512` patches, please specify the arguments `--space 512 --step_size 448`.
 
 ## 🔬 Extract the Nuclei Feature
 Please specify `--mode coco` or `--mode all` during WSI inference. Make sure you have installed the [histomicstk](https://digitalslidearchive.github.io/HistomicsTK/) successfully.
