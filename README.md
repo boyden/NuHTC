@@ -126,7 +126,7 @@ Segment for the WSI with support output version: qupath, sql, dsa, and coco. Do 
 (Note: we support the version of both point and instance contour for qupath format. Coco is only for storing the patch nuclei segmentation results now)
 ```shell script
 CUDA_VISIBLE_DEVICES=0 python tools/infer_wsi.py demo/wsi configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py models/pannuke.pth \
---out demo/wsi_res --patch --seg --stitch --space 256 --step_size 192 --target_spacing 0.25 --margin 2 --min_area 10 \
+--out demo/wsi_res --patch --seg --stitch --space 256 --step_size 192 --margin 2 --min_area 10 \
 --save_dir demo/wsi_infer --mode qupath --no_auto_skip
 ```
 
