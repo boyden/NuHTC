@@ -133,7 +133,7 @@ CUDA_VISIBLE_DEVICES=0 python tools/infer_wsi.py demo/wsi configs/nuhtc/htc_lite
 Our model is trained on patches of size `256×256` at 40X magnification. During inference, it maintains strong performance even when evaluated with a larger patch size of `512×512`. To run inference using `512×512` patches, please specify the arguments `--space 512 --step_size 448`.
 
 ## 🔬 Extract the Nuclei Feature
-After Please make sure you have installed the `histomicstk` correctly.
+Please specify `--mode coco` or `--mode all` during WSI inference. Make sure you have installed the `histomicstk` successfully.
 ```shell script
 python tools/nuclei_feat_extract.py demo/wsi_res
 # datadir (str)
