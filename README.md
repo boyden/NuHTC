@@ -163,3 +163,15 @@ It will extract the nuclei feature for each image and then store them in a csv f
 
 ## 🗓️ Ongoing
 - [ ] Merge overlap nuclei when segmenting the WSI
+
+## 📖 Citation
+```
+@article{li2025nuhtc,
+  title={NuHTC: A hybrid task cascade for nuclei instance segmentation and classification},
+  author={Li, Bao and Liu, Zhenyu and Zhang, Song and Liu, Xiangyu and Sun, Caixia and Liu, Jiangang and Qiu, Bensheng and Tian, Jie},
+  journal={Medical Image Analysis},
+  pages={103595},
+  year={2025},
+  publisher={Elsevier}
+}
+```
