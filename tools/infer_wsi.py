@@ -521,6 +521,7 @@ def main():
                 bbox_results[mask_id] = bbox_results[mask_id][select_id] + np.tile(coord[mask_id], 2)
                 labels[mask_id] = labels[mask_id][select_id]
                 fg_scores[mask_id] = fg_scores[mask_id][select_id]
+
                 if args.mode == 'qupath' or args.mode == 'all':
                     # QuPath 0.4.4
                     geojson = [{
@@ -559,6 +560,7 @@ def main():
                     } for i in range(len(seg_mask[mask_id]))]
                     pointjson_li += pointjson
                     geojson_li += geojson
+
                 if args.mode == 'dsa' or args.mode == 'all':
                     dsajson = [{
                         "fillColor": model.inst_fillColor[labels[mask_id][i]],
@@ -607,6 +609,29 @@ def main():
                     if not os.path.exists(img_dir):
                         os.makedirs(f'{args.save_dir}/imgs/{slide_id}', exist_ok=True)
                         Image.fromarray(img[mask_id]).save(img_dir)
+                
+                if args.mode == 'sql' or args.mode == 'all':
+                    for i in range(len(seg_mask[mask_id])):
+                        con_dict = {
+                            "annidx": annidx,
+                            "elementidx": i,
+                            "type": 'polyline',
+                            "group": model.CLASSES[labels[mask_id][i]],
+                            "score": float(fg_scores[mask_id][i]),
+                            "color": model.inst_lineColor[labels[mask_id][i]],
+                            "xmin": seg_mask[mask_id][i][0, :, 0].min(),
+                            "xmax": seg_mask[mask_id][i][0, :, 0].max(),
+                            "ymin": seg_mask[mask_id][i][0, :, 1].min(),
+                            "ymax": seg_mask[mask_id][i][0, :, 1].max(),
+                            "bbox_area": (seg_mask[mask_id][i][0, :, 0].max() - seg_mask[mask_id][i][0, :, 0].min()) * (
+                                        seg_mask[mask_id][i][0, :, 1].max() - seg_mask[mask_id][i][0, :, 1].min()),
+                            "coords_x": ','.join(seg_mask[mask_id][i][0, :, 0].astype(np.str)),
+                            "coords_y": ','.join(seg_mask[mask_id][i][0, :, 1].astype(np.str)),
+                            "keep": int(1),
+                        }
+                        c.execute(f'''INSERT INTO contour (annidx, elementidx, type, "group", score, color, xmin, ymin, xmax, ymax, bbox_area, coords_x, coords_y, keep) 
+                                     VALUES ({con_dict['annidx']}, {con_dict['elementidx']}, "{con_dict['type']}", "{con_dict['group']}", {con_dict['score']}, "{con_dict['color']}", {con_dict['xmin']}, {con_dict['ymin']}, {con_dict['xmax']}, {con_dict['ymax']}, {con_dict['bbox_area']}, "{con_dict['coords_x']}", "{con_dict['coords_y']}", {con_dict['keep']});
+                                     ''')
 
             if idx % 5000 == 0 or idx == len(infer_dataloader) - 1:
                 if args.mode == 'qupath' or args.mode == 'all':
@@ -630,6 +655,18 @@ def main():
                                         }
                     with open(f'{args.save_dir}/{slide_id}/coco_nuclei.json', 'w') as f:
                         json.dump(nuclei_annt_json, f)
+                if args.mode == 'sql' or args.mode == 'all':
+                    conn.commit()
+                    conn.close()
+                    conn = sqlite3.connect(f'{args.save_dir}/{slide_id}/{slide_id}_dql.db')
+                    c = conn.cursor()
+                    if idx == len(infer_dataloader) - 1:
+                        c.execute('''DROP TABLE IF EXISTS rtree;''')
+                        c.execute('''CREATE VIRTUAL TABLE rtree USING rtree(id, xmin, xmax, ymin, ymax);''')
+                        c.execute(
+                            '''INSERT INTO rtree (id, xmin, xmax, ymin, ymax) SELECT id, xmin, xmax, ymin, ymax FROM contour;''')
+                        conn.commit()
+                        conn.close()
 
 if __name__ == '__main__':
     main()
