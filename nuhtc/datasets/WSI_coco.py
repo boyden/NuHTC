@@ -692,8 +692,8 @@ class WSICocoDataset(CocoDataset):
         mask2: [m2,n] m2 means number of gt objects
         Note: n means image_w x image_h
         """
-        true_masks = true_masks.astype(np.float)
-        pred_masks = pred_masks.astype(np.float)
+        true_masks = true_masks.astype(float)
+        pred_masks = pred_masks.astype(float)
         if len(true_masks.shape) > 2 or len(pred_masks.shape) > 2:
             true_masks = true_masks.reshape((true_masks.shape[0], -1))
             pred_masks = pred_masks.reshape((pred_masks.shape[0], -1))
@@ -862,7 +862,7 @@ class WSICocoDataset(CocoDataset):
 
     def convert_format(self, mask_li, label_li, img_info, data_format='conic'):
         if data_format == 'pannuke':
-            mask = np.zeros((img_info['height'], img_info['width'], len(self.CLASSES)+1), dtype=np.int)
+            mask = np.zeros((img_info['height'], img_info['width'], len(self.CLASSES)+1), dtype=int)
             if len(mask_li) == 0:
                 return mask
             masks = maskUtils.decode(mask_li).transpose((2, 0, 1))
@@ -874,7 +874,7 @@ class WSICocoDataset(CocoDataset):
                 mask[:, :, i] = np.max(tmp_masks*mask_id_list.reshape((-1, 1, 1)), axis=0)
             mask[:, :, -1] = 1 - np.max(masks, axis=0)
         elif data_format == 'consep':
-            mask = np.zeros((img_info['height'], img_info['width'], 2), dtype=np.int)
+            mask = np.zeros((img_info['height'], img_info['width'], 2), dtype=int)
             if len(mask_li) != 0:
                 masks = maskUtils.decode(mask_li).transpose((2, 0, 1))
                 mask_id_list = np.array(range(1, len(masks)+1))
@@ -898,7 +898,7 @@ class WSICocoDataset(CocoDataset):
                 }
                 return pred_mat
         else:
-            mask = np.zeros((img_info['height'], img_info['width'], 2), dtype=np.int)
+            mask = np.zeros((img_info['height'], img_info['width'], 2), dtype=int)
             if len(mask_li) != 0:
                 masks = maskUtils.decode(mask_li).transpose((2, 0, 1))
                 mask_id_list = np.array(range(1, len(masks)+1))
