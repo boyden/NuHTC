@@ -23,7 +23,7 @@ python -m pip install histomicstk==1.2.10 --find-links https://girder.github.io/
 ```
 
 ## 👉 Preprocessing data
-First, please download and unzip the files from [PanNuke dataset](https://warwick.ac.uk/fac/cross_fac/tia/data/pannuke) where the folder structure should look like this:
+First please download and unzip the files from [PanNuke dataset](https://warwick.ac.uk/fac/cross_fac/tia/data/pannuke), where the folder structure should look like this:
 
 ```
 NuHTC
@@ -60,7 +60,7 @@ NuHTC
 │   │   ├── PanNuke_annt_RLE_fold3.json
 ├── ...
 ```
-Then generating `png` files for training and test.
+Then generating `png` files for training and testing.
 ```python
 import os
 import numpy as np
@@ -92,11 +92,11 @@ for fold in range(3):
 
 ## 👉 Train
 ```shell script
-# Please modify the `fold = 1` content to change the fold.
+# Please modify the `fold = 1` content in `htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py` to change the fold value.
 CUDA_VISIBLE_DEVICES=0 python tools/train.py configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py --no-validate
 ```
 
-Note, recent update (~May 2024, driver version 555.85, 555.99, 556.12) of Nvidia driver may lead to `UnicodeDecodeError: 'utf-8' codec can't decode byte 0xf8 in position 0: invalid start byte` in init wandb package. If your nvidia driver version is greater than `552.44`, please downgrade to the `Nvidia 552.44 studio driver` or update to the version greater than `560.70` for successfully training the models. For more details, please refer to [wandb issue](https://github.com/wandb/wandb/issues/7683).
+Note, recent update (~May 2024, driver version 555.85, 555.99, 556.12) of Nvidia driver may lead to `UnicodeDecodeError: 'utf-8' codec can't decode byte 0xf8 in position 0: invalid start byte` in init wandb package. If your Nvidia driver version is greater than `552.44`, please downgrade to the `Nvidia 552.44 studio driver` or update to a version greater than `560.70` for successfully training the models. For more details, please refer to [wandb issue](https://github.com/wandb/wandb/issues/7683).
 
 ## 👉 Test
 ``` shell script
@@ -121,7 +121,7 @@ CUDA_VISIBLE_DEVICES=0 python tools/infer.py demo/imgs configs/nuhtc/htc_lite_sw
 ```
 
 ## 🚀 Segment the Whole Slide Image
-Segment for the WSI with support output version: `qupath`, `sql`, `dsa`, and `coco`. Do not automatically support various magnifications. (Default: 40X).
+Segment for the WSI with support output versions: `qupath`, `sql`, `dsa`, and `coco`. Do not automatically support various magnifications. (Default: 40X).
 
 (Note: we support the version of both nuclei point and contour for qupath format. Coco is only for storing the patch nuclei segmentation results now)
 ```shell script
@@ -136,7 +136,7 @@ The `dsa` is a format supported by [Digital Slide Archive](https://digitalslidea
 Our model is trained with a patch size `256×256` at 40X magnification. During inference, it maintains strong performance even when evaluated with a larger patch size of `512×512`. To run inference using `512×512` patches, please specify the arguments `--space 512 --step_size 448`.
 
 ## 🔬 Extract the Nuclei Feature
-Please specify `--mode coco` or `--mode all` during WSI inference. Make sure you have installed the [histomicstk](https://digitalslidearchive.github.io/HistomicsTK/) successfully.
+Please specify `--mode coco` or `--mode all` during WSI inference. Make sure you have successfully installed the [histomicstk](https://digitalslidearchive.github.io/HistomicsTK/).
 ```shell script
 python tools/nuclei_feat_extract.py demo/wsi_res
 # datadir (str)
