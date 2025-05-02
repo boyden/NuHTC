@@ -91,7 +91,7 @@ for fold in range(3):
 ```
 
 ## 👉 Train
-This is an example of training NuHTC on the first fold. To train on other folds, update the `fold = 1` value in `htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py` to other folds.
+This is an example of training NuHTC on the first fold. To train on other folds, update the `fold = 1` content in `htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py` to other folds.
 
 ```shell script
 CUDA_VISIBLE_DEVICES=0 python tools/train.py configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py --no-validate
