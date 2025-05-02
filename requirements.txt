@@ -21,7 +21,7 @@ prettytable
 pycocotools==2.0.7
 pytorch_sphinx_theme
 requests
-scikit-image==0.24.0
+scikit-image==0.18.3
 scikit-learn==1.1
 scipy==1.15.2 
 seaborn
