@@ -22,8 +22,8 @@ pip install mmcv-full==1.7.2 -f https://download.openmmlab.com/mmcv/dist/cu116/t
 python -m pip install histomicstk==1.2.10 --find-links https://girder.github.io/large_image_wheels -i https://pypi.org/simple
 ```
 
-## 👉 Preporcessing data
-First please download and unzip the files from [PanNuke dataset](https://warwick.ac.uk/fac/cross_fac/tia/data/pannuke) where the folder structure should look this:
+## 👉 Preprocessing data
+First, please download and unzip the files from [PanNuke dataset](https://warwick.ac.uk/fac/cross_fac/tia/data/pannuke) where the folder structure should look like this:
 
 ```
 NuHTC
