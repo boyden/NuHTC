@@ -127,7 +127,7 @@ Segment for the WSI with support output versions: `qupath`, `sql`, `dsa`, and `c
 (Note: we support the version of both nuclei point and contour for qupath format. Coco is only for storing the patch nuclei segmentation results now)
 ```shell script
 CUDA_VISIBLE_DEVICES=0 python tools/infer_wsi.py demo/wsi configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py models/pannuke.pth \
---out demo/wsi_res --patch --seg --stitch --patch_size 256 --step_size 192 --margin 1 --min_area 10 \
+--out demo/wsi_res --patch --seg --stitch --patch_size 256 --step_size 192 --margin 1 --min_area 10 --batch_size 32 \
 --save_dir demo/wsi_infer --mode qupath --no_auto_skip
 ```
 We provide a WSI example from TCGA (filename: `TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724.svs`), which includes the `geojson` file for both nuclei points and contours. These can be easily dragged into, viewed, and edited using [QuPath](https://qupath.github.io/). The WSI example can be downloaded from [Google Drive](https://drive.google.com/drive/folders/1UdCixl10kBxyKHUGOww4WIkdoFma-UIr?usp=drive_link).

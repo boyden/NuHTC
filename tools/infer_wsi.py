@@ -332,7 +332,9 @@ def parse_args():
     parser.add_argument('--patch_level', type=int, default=0,
                         help='downsample level at which to patch')
     parser.add_argument('--batch_size', type=int, default=32,
-                        help='batch size of images during inference')
+                        help='batch size of image dataset during inference')
+    parser.add_argument('--num_workers', type=int, default=8,
+                        help='number workers of image dataset during inference')
     parser.add_argument('--margin', type=int, default=0,
                         help='discard the contour which distance is less than margin number pixels to edges')
     parser.add_argument('--min_area', type=int, default=10,
@@ -450,7 +452,7 @@ def main():
         coords = []
         # os.makedirs(f'{args.save_dir}/{slide_id}/img', exist_ok=True)
         os.makedirs(f'{args.save_dir}/{slide_id}/infer', exist_ok=True)
-        infer_dataloader = DataLoader(dataset, batch_size=batch_size, num_workers=8)
+        infer_dataloader = DataLoader(dataset, batch_size=batch_size, num_workers=args.num_workers)
         geojson_li = []
         pointjson_li = []
         dsajson_li = []
