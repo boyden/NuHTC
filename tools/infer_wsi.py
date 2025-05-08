@@ -333,6 +333,10 @@ def parse_args():
                         help='downsample level at which to patch')
     parser.add_argument('--batch_size', type=int, default=32,
                         help='batch size of images during inference')
+    parser.add_argument('--margin', type=int, default=0,
+                        help='discard the contour which distance is less than margin number pixels to edges')
+    parser.add_argument('--min_area', type=int, default=10,
+                        help='discard the area less than min_area')
     parser.add_argument('--process_list',  type = str, default=None,
                         help='name of list of images to process with parameters (.csv)')
     parser.add_argument('--slide_ext',  type = str, default='.svs',
@@ -490,8 +494,13 @@ def main():
                         font_size=6, thickness=1
                     )
                 seg_area = (seg_mask[mask_id] == 1).sum(axis=(1, 2))
-                select_id = (bbox_results[mask_id][:, 0] >= 1) & (bbox_results[mask_id][:, 1] >=1) & (bbox_results[mask_id][:, 2] <= img_shape[1]-1) & (bbox_results[mask_id][:, 3] <= img_shape[0]-1)
-                select_id = select_id & (seg_area>10)
+                select_id = (
+                    (bbox_results[mask_id][:, 0] >= args.margin) &
+                    (bbox_results[mask_id][:, 1] >= args.margin) &
+                    (bbox_results[mask_id][:, 2] <= img_shape[1] - args.margin) &
+                    (bbox_results[mask_id][:, 3] <= img_shape[0] - args.margin)
+                )
+                select_id = select_id & (seg_area>=args.min_area)
                 bbox_results[mask_id] = bbox_results[mask_id][select_id]
                 seg_mask[mask_id] = seg_mask[mask_id][select_id]
                 labels[mask_id] = labels[mask_id][select_id]
