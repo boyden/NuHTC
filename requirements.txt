@@ -23,7 +23,7 @@ pytorch_sphinx_theme
 requests
 scikit-image==0.18.3
 scikit-learn==1.1
-scipy
+scipy==1.15.2 
 seaborn
 setuptools
 six
