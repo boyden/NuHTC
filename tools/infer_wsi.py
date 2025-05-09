@@ -331,6 +331,8 @@ def parse_args():
                         help='predefined profile of default segmentation and filter parameters (.csv)')
     parser.add_argument('--patch_level', type=int, default=0,
                         help='downsample level at which to patch')
+    parser.add_argument('--mag', '--magnification', type=int, default=40,
+                        help='magnification for the slide', dest='mag')
     parser.add_argument('--batch_size', type=int, default=32,
                         help='batch size of image dataset during inference')
     parser.add_argument('--num_workers', type=int, default=8,
@@ -409,6 +411,10 @@ def main():
     # Not affect anything, just avoid index error
     cfg.work_dir = "./work_dirs"
     cfg = patch_config(cfg)
+    for test_pipe in cfg['data']['test']['pipeline']:
+        if test_pipe['type'] == 'MultiScaleFlipAug':
+            test_pipe['scale_factor'] = float(80/args.mag)
+
     # build the model from a config file and a checkpoint file
     model = init_detector(cfg, args.checkpoint, device=args.device)
     MAIN_CLASSES = ('T', 'I', 'C', 'D', 'E')
