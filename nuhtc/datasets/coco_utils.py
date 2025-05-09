@@ -13,7 +13,7 @@ from pycocotools import mask as coco_mask
 from pycocotools.coco import COCO
 from sklearn.metrics import roc_auc_score, matthews_corrcoef
 from scipy.special import softmax
-from histomicstk.annotations_and_masks.annotation_and_mask_utils import np_vec_no_jit_iou
+# from histomicstk.annotations_and_masks.annotation_and_mask_utils import np_vec_no_jit_iou
 from scipy.optimize import linear_sum_assignment
 from copy import deepcopy
 
