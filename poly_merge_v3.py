@@ -1,22 +1,21 @@
 '''
 Note: Boundary/margin cells already removed, input to _remove_overlap() is cleaned cells list / df
 
-@input datadir: Path to folder containing geojson file
-@input geojson_name: Geojson file name
-@input overlap_threshold: Area overlap percentage threshold to be removed
+@input --datadir: Path to folder containing geojson file
+@input --geojson_name: Geojson file name
+@input --overlap_threshold: Area overlap percentage threshold to be removed
+@input --uniform_classification: Whether to classify all cells uniformly and represent as the same color (yellow)
 
     Example call:
     !python poly_merge_v3.py \
-    /home/sul084/immune-decoder/segmentation/NuHTC/demo/wsi_infer/BL-13 \
-    BL-13-K40642
+    --datadir /home/sul084/immune-decoder/segmentation/NuHTC/demo/wsi_infer/TCGA-AC-A2FK \
+    --geojson_name TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724 \
+    --overlap_threshold 0.05 
+    --uniform_classification
 
 @output processed geojson file
 
 Last updated: 5/20/2025
-
-TODO: 
-    - Add cell properties to saved geojson (including cell type, cell probabilities)
-    - Check 0.01 vs 0.05 threshold
 '''
 
 import os
@@ -42,7 +41,7 @@ warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
 
 ## Base code: CellViT++, adapted for NuHTC
-def _remove_overlap(cleaned_edge_cells: pd.DataFrame, overlap_threshold) -> pd.DataFrame:
+def _remove_overlap(cleaned_edge_cells: pd.DataFrame, overlap_threshold, uniform_classification) -> pd.DataFrame:
     
     """
     Removes overlapping cells from provided DataFrame.
@@ -51,6 +50,7 @@ def _remove_overlap(cleaned_edge_cells: pd.DataFrame, overlap_threshold) -> pd.D
     ----------
         cleaned_edge_cells (pd.DataFrame) : DataFrame that should be cleaned
         overlap_threshold (float) : Area overlap percentage threshold to be removed, default 0.01
+        uniform_classification (store_true bool) : Whether to classify all cells uniformly and represent as the same color (yellow). Default (if unspecified) False
     Returns
     ----------
         pd.DataFrame : Cleaned DataFrame
@@ -175,15 +175,13 @@ def main():
     geojson_name = args.geojson_name
     with open(f'{datadir}/{geojson_name}.geojson', 'r') as f:
         data = json.load(f) # List
-
+    
     # Function call
-    data_processed = _remove_overlap(data, args.overlap_threshold)
+    data_processed = _remove_overlap(data, args.overlap_threshold, args.uniform_classification)
     output_path = f"{datadir}/processed_{geojson_name}.geojson"
 
-    print('Converting to geojson...')
-
-    # Save as geojson
     # Convert each row into a GeoJSON Feature
+    print('Converting to geojson...')
     features = []
     for _, row in data_processed.iterrows():
         geometry = row["geometry"]
@@ -193,10 +191,13 @@ def main():
             "geometry": geometry,
             "properties": props
         }
+        if args.uniform_classification:
+            row["properties"]["classification"]["name"] = "uniform"
+            row["properties"]["classification"]["color"] = [255, 255, 0] # Yellow
+
         features.append(feature)
-
+        
     print('Saving as flat list of geojson features...')
-
     with open(output_path, "w") as f:
         json.dump(features, f)
     
@@ -205,9 +206,10 @@ def main():
     
 def parse_args():
     parser = ArgumentParser()
-    parser.add_argument("datadir", help="path to folder containing geojson file")
-    parser.add_argument("geojson_name", help="geojson file name")
-    parser.add_argument("overlap_threshold", type=float, default=0.01, help="area overlap percentage threshold to be removed")
+    parser.add_argument("--datadir", help="path to folder containing geojson file")
+    parser.add_argument("--geojson_name", help="geojson file name")
+    parser.add_argument("--overlap_threshold", type=float, default=0.01, help="area overlap percentage threshold to be removed")
+    parser.add_argument("--uniform_classification", action="store_true", help="whether to classify all cells uniformly and represent as the same color (yellow)")
 
     args = parser.parse_args()
     return args
