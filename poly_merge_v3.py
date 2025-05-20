@@ -3,6 +3,7 @@ Note: Boundary/margin cells already removed, input to _remove_overlap() is clean
 
 @input datadir: Path to folder containing geojson file
 @input geojson_name: Geojson file name
+@input overlap_threshold: Area overlap percentage threshold to be removed
 
     Example call:
     !python poly_merge_v3.py \
@@ -39,17 +40,23 @@ from collections import deque
 
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
+
 ## Base code: CellViT++, adapted for NuHTC
-def _remove_overlap(cleaned_edge_cells: pd.DataFrame) -> pd.DataFrame:
-    """Remove overlapping cells from provided DataFrame
-
-    Args:
-        cleaned_edge_cells (pd.DataFrame): DataFrame that should be cleaned
-
-    Returns:
-        pd.DataFrame: Cleaned DataFrame
+def _remove_overlap(cleaned_edge_cells: pd.DataFrame, overlap_threshold) -> pd.DataFrame:
     
     """
+    Removes overlapping cells from provided DataFrame.
+    
+    Args
+    ----------
+        cleaned_edge_cells (pd.DataFrame) : DataFrame that should be cleaned
+        overlap_threshold (float) : Area overlap percentage threshold to be removed, default 0.01
+    Returns
+    ----------
+        pd.DataFrame : Cleaned DataFrame
+        saved geojson file
+    """
+    
     start_time = time.time()
     cleaned_edge_cells = pd.DataFrame(cleaned_edge_cells)
     merged_cells = cleaned_edge_cells
@@ -115,10 +122,10 @@ def _remove_overlap(cleaned_edge_cells: pd.DataFrame) -> pd.DataFrame:
                             if (
                                 query_poly.intersection(inter_poly).area
                                 / query_poly.area
-                                > 0.01
+                                > overlap_threshold
                                 or query_poly.intersection(inter_poly).area
                                 / inter_poly.area
-                                > 0.01
+                                > overlap_threshold
                             ):
                                 overlaps = overlaps + 1
                                 submergers.append(inter_poly)
@@ -162,13 +169,15 @@ def _remove_overlap(cleaned_edge_cells: pd.DataFrame) -> pd.DataFrame:
 
 
 def main():
+    
     args = parse_args()
     datadir = args.datadir
     geojson_name = args.geojson_name
     with open(f'{datadir}/{geojson_name}.geojson', 'r') as f:
         data = json.load(f) # List
 
-    data_processed = _remove_overlap(data)
+    # Function call
+    data_processed = _remove_overlap(data, args.overlap_threshold)
     output_path = f"{datadir}/processed_{geojson_name}.geojson"
 
     print('Converting to geojson...')
@@ -194,11 +203,14 @@ def main():
     with open(output_path, "w") as f:
         json.dump(geojson_dict, f)
 
+    print('Merge and save complete.')
+
     
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument("datadir", help="path to folder containing geojson file")
     parser.add_argument("geojson_name", help="geojson file name")
+    parser.add_argument("overlap_threshold", type=float, default=0.01, help="area overlap percentage threshold to be removed")
 
     args = parser.parse_args()
     return args
