@@ -12,7 +12,7 @@ Note: Boundary/margin cells already removed, input to _remove_overlap() is clean
 
 @output processed geojson file
 
-Last updated: 5/19/2025
+Last updated: 5/20/2025
 
 TODO: 
     - Add cell properties to saved geojson (including cell type, cell probabilities)
@@ -186,23 +186,20 @@ def main():
     # Convert each row into a GeoJSON Feature
     features = []
     for _, row in data_processed.iterrows():
+        geometry = row["geometry"]
+        props = row["properties"]
         feature = {
             "type": "Feature",
-            "geometry": row["geometry"],  # Assumes this is already a valid GeoJSON geometry dict
-            "properties": row.drop("geometry").to_dict()  # All other metadata
+            "geometry": geometry,
+            "properties": props
         }
         features.append(feature)
 
-    print('Saving as geojson...')
-    
-    # Create the FeatureCollection
-    geojson_dict = {
-        "type": "FeatureCollection",
-        "features": features}
-    
-    with open(output_path, "w") as f:
-        json.dump(geojson_dict, f)
+    print('Saving as flat list of geojson features...')
 
+    with open(output_path, "w") as f:
+        json.dump(features, f)
+    
     print('Merge and save complete.')
 
     
