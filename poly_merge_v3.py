@@ -4,13 +4,15 @@ Note: Boundary/margin cells already removed, input to _remove_overlap() is clean
 @input --datadir: Path to folder containing geojson file
 @input --geojson_name: Geojson file name
 @input --overlap_threshold: Area overlap percentage threshold to be removed
+@input --merge_strategy: Whether to keep the cell with highest probability or largest area, specify 'probability' or 'area' 
 @input --uniform_classification: Whether to classify all cells uniformly and represent as the same color (yellow)
 
     Example call:
     !python poly_merge_v3.py \
     --datadir /home/sul084/immune-decoder/segmentation/NuHTC/demo/wsi_infer/TCGA-AC-A2FK \
     --geojson_name TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724 \
-    --overlap_threshold 0.05 
+    --overlap_threshold 0.05 \
+    --merge_strategy probability \
     --uniform_classification
 
 @output processed geojson file
@@ -41,7 +43,7 @@ warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
 
 ## Base code: CellViT++, adapted for NuHTC
-def _remove_overlap(cleaned_edge_cells: pd.DataFrame, overlap_threshold, uniform_classification) -> pd.DataFrame:
+def _remove_overlap(cleaned_edge_cells: pd.DataFrame, overlap_threshold, merge_strategy, uniform_classification) -> pd.DataFrame:
     
     """
     Removes overlapping cells from provided DataFrame.
@@ -50,6 +52,7 @@ def _remove_overlap(cleaned_edge_cells: pd.DataFrame, overlap_threshold, uniform
     ----------
         cleaned_edge_cells (pd.DataFrame) : DataFrame that should be cleaned
         overlap_threshold (float) : Area overlap percentage threshold to be removed, default 0.01
+        merge_strategy (str): Whether to keep the cell with highest probability or largest area, specify 'probability' or 'area'
         uniform_classification (store_true bool) : Whether to classify all cells uniformly and represent as the same color (yellow). Default (if unspecified) False
     Returns
     ----------
@@ -133,8 +136,23 @@ def _remove_overlap(cleaned_edge_cells: pd.DataFrame, overlap_threshold, uniform
                     # Catch block: empty list -> some cells are touching, but not overlapping strongly enough
                     if len(submergers) == 0:
                         merged_idx.append(query_uid)
-                    else:  # Merging strategy: take the biggest cell, other merging strategies needs to get implemented
-                        selected_poly_index = np.argmax(np.array([p.area for p in submergers]))
+                    # Merging strategy
+                    else:  
+                        if merge_strategy == 'probability':
+                            scores = []
+                            for i, p in enumerate(submergers):
+                                uid = poly_uid_map[p]
+                                props = merged_cells.loc[uid, 'properties']
+                                score = props.get('score', 0)
+                                scores.append(score)
+                                # print(f'  Submerger {i}: UID = {uid}, Score = {score:.4f}')
+                            selected_poly_index = int(np.argmax(scores))
+                            
+                        elif merge_strategy == 'area':
+                            selected_poly_index = np.argmax(np.array([p.area for p in submergers]))
+                        else:
+                            print('Invalid merge cell strategy.')
+                            return
                         selected_poly = submergers[selected_poly_index]
                         selected_uid = poly_uid_map[selected_poly]
                         merged_idx.append(selected_uid)
@@ -164,7 +182,7 @@ def _remove_overlap(cleaned_edge_cells: pd.DataFrame, overlap_threshold, uniform
 
     end_time = time.time()
     print(f"Cell overlap removal elapsed time: {end_time - start_time:.4f} seconds")
-
+    
     return merged_cells.sort_index()
 
 
@@ -177,8 +195,8 @@ def main():
         data = json.load(f) # List
     
     # Function call
-    data_processed = _remove_overlap(data, args.overlap_threshold, args.uniform_classification)
-    output_path = f"{datadir}/processed_{args.overlap_threshold}_{geojson_name}.geojson"
+    data_processed = _remove_overlap(data, args.overlap_threshold, args.merge_strategy, args.uniform_classification)
+    output_path = f"{datadir}/{args.merge_strategy}_processed_{args.overlap_threshold}_unif_{args.uniform_classification}_{geojson_name}.geojson"
 
     # Convert each row into a GeoJSON Feature
     print('Converting to geojson...')
@@ -209,6 +227,7 @@ def parse_args():
     parser.add_argument("--datadir", help="path to folder containing geojson file")
     parser.add_argument("--geojson_name", help="geojson file name")
     parser.add_argument("--overlap_threshold", type=float, default=0.01, help="area overlap percentage threshold to be removed")
+    parser.add_argument("--merge_strategy", default="probability", help="whether to keep the cell with highest probability or largest area, specify 'probability' or 'area'")
     parser.add_argument("--uniform_classification", action="store_true", help="whether to classify all cells uniformly and represent as the same color (yellow)")
 
     args = parser.parse_args()
