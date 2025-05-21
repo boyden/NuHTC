@@ -121,10 +121,10 @@ def _remove_overlap(cleaned_edge_cells: pd.DataFrame, overlap_threshold, uniform
                         ):
                             if (
                                 query_poly.intersection(inter_poly).area
-                                / query_poly.area
+                                / (query_poly.area + inter_poly.area - query_poly.intersection(inter_poly).area)
                                 > overlap_threshold
                                 or query_poly.intersection(inter_poly).area
-                                / inter_poly.area
+                                / (query_poly.area + inter_poly.area - query_poly.intersection(inter_poly).area)
                                 > overlap_threshold
                             ):
                                 overlaps = overlaps + 1
@@ -178,7 +178,7 @@ def main():
     
     # Function call
     data_processed = _remove_overlap(data, args.overlap_threshold, args.uniform_classification)
-    output_path = f"{datadir}/processed_{geojson_name}.geojson"
+    output_path = f"{datadir}/processed_{args.overlap_threshold}_{geojson_name}.geojson"
 
     # Convert each row into a GeoJSON Feature
     print('Converting to geojson...')
