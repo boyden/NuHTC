@@ -19,13 +19,14 @@ from multiprocessing import Pool
 warnings.filterwarnings('ignore')
 
 class WSI_Crop(Dataset):
-    def __init__(self, wsi, coord_li, mag=40):
+    def __init__(self, wsi, coord_li, mag=40, savedir=None):
         self.mag = mag
         self.wsi = wsi
         self.coord_li = coord_li
         wsi_width, wsi_height = wsi.level_dimensions[0]
         self.wsi_width = wsi_width
         self.wsi_height = wsi_height
+        self.savedir = savedir
 
     def __len__(self):
         return len(self.coord_li)
@@ -58,6 +59,16 @@ class WSI_Crop(Dataset):
 
         nu_mask = np.zeros(rgb_img.shape[:2], dtype=np.uint8)
         nu_mask = cv2.fillPoly(nu_mask, [coord_map.astype(np.int32)], 1)
+        
+        # For debugging purposes
+        if self.savedir is not None:
+            os.makedirs(self.savedir, exist_ok=True)
+            nu_img = rgb_img.copy()
+            contour = coord_map.astype(np.int32).reshape((-1, 1, 2))
+            # Draw the contour on the image
+            cv2.polylines(nu_img, [contour], isClosed=True, color=(0, 255, 0), thickness=1)
+            Image.fromarray(nu_img).save(f'{self.savedir}/{idx}.png')
+
         return {
             'image': rgb_img,
             'mask': nu_mask,
