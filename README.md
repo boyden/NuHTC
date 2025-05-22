@@ -154,7 +154,7 @@ We support two approaches for extracting nuclear features. The first extracts a 
 We recommend using the first way. Here is an example:
 ```shell script
 # demo/wsi is the path to the folder containing raw WSI image files
-# segdir is the path to folder containing segmentation files
+# segdir is the path to the folder containing segmentation files
 python tools/wsi_feat_extract.py demo/wsi --segdir demo/wsi_res
 ```
 For the second way that tile the images first, please specify `--mode coco` or `--mode all` during WSI inference.
@@ -186,7 +186,7 @@ It will extract the nuclei feature for each image and then store them in a csv f
 
 
 ## 🗓️ Ongoing
-- ✅ Merge overlapping nuclei when segmenting the WSI
+- [x] Merge overlapping nuclei when segmenting the WSI
 
 ## 📖 Citation
 ```
