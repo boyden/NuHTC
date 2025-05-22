@@ -11,6 +11,7 @@
   <a href="#-extract-the-nuclei-feature">Feature Extraction</a> |
   <a href="#-citation">Citation</a>
 </p>
+
 ![](./resources/nuhtc.jpg)
 This repo is the official implementation of NuHTC.
 
