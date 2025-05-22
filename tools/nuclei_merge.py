@@ -193,14 +193,16 @@ def main():
     # Convert each row into a GeoJSON Feature
     print('Converting to geojson...')
     features = []
-    for _, row in data_processed.iterrows():
+    for idx, row in data_processed.iterrows():
         geometry = row["geometry"]
         props = row["properties"]
+        props['nuclei_id'] = idx
         feature = {
             "type": "Feature",
             "geometry": geometry,
             "properties": props
         }
+
         if args.uniform_classification:
             row["properties"]["classification"]["name"] = "uniform"
             row["properties"]["classification"]["color"] = [255, 255, 0] # Yellow
