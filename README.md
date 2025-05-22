@@ -1,7 +1,7 @@
 # NuHTC: A Hybrid Task Cascade for Nuclei Instance Segmentation and Classification
 
 <p align="center">
-  &gt;  <a href="https://boyden.github.io">Bao Li</a>, et al.
+  <a href="https://boyden.github.io">Bao Li</a>, et al.
 </p>
 
 <p align="center">
