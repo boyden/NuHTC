@@ -2,10 +2,12 @@
 
 >  [Bao Li](https://boyden.github.io), et al.
 
+<p align="center">
+[Setup](#-setup-environment) | [Train](#-train) | [Test](#-test) | [Infer](#-infer) | [WSI Segmentation](#-segment-the-whole-slide-image) | [Feature Extraction](#-extract-the-nuclei-feature) | [Citation](#-citation)
+</p>
+
 ![](./resources/nuhtc.jpg)
 This repo is the official implementation of NuHTC.
-
-[Setup](#-setup-environment) | [Train](#-train) | [Test](#-test) | [Infer](#-infer) | [WSI Segmentation](#-segment-the-whole-slide-image) | [Feature Extraction](#-extract-the-nuclei-feature) | [Citation](#-citation)
 
 ## Overlaid Segmentation and Classification Prediction
 The demo may take around 10s to load. 
