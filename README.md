@@ -5,7 +5,7 @@
 ![](./resources/nuhtc.jpg)
 This repo is the official implementation of NuHTC.
 
-[Setup Environment](#-setup-environment) | [Preprocessing data](#-preprocessing-data) | [Train](#-train) | [Test](#-test) | [Infer](#-infer) | [Segment the Whole Slide Image](#-segment-the-whole-slide-image) | [Extract the Nuclei Feature](#-extract-the-nuclei-feature) | [Ongoing](#-ongoing) | [Citation](#-citation)
+[Setup Environment](#-setup-environment) | [Preprocessing data](#-preprocessing-data) | [Train](#-train) | [Test](#-test) | [Infer](#-infer) | [WSI Segmentation](#-segment-the-whole-slide-image) | [Nuclei Feature Extraction](#-extract-the-nuclei-feature) | [Citation](#-citation)
 
 ## Overlaid Segmentation and Classification Prediction
 The demo may take around 10s to load. 
