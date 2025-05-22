@@ -101,6 +101,23 @@ def extract_feat(datadir, segdir,
             num_workers=16,
             min_num=16, 
             reverse=False):
+    """
+    Extracts nuclei features from whole slide images (WSI) and stores them in a SQLite database.
+
+    Parameters:
+    - datadir (str): Path to the directory containing raw WSI image files.
+    - segdir (str): Path to the directory containing segmentation files.
+    - start (int, optional): Start index for processing slides. Defaults to 0.
+    - end (int, optional): End index for processing slides. If -1, processes all slides from the start index. If None, processes all slides starting from the start index. Defaults to -1.
+    - mag (int, optional): Magnification level of the slide. Defaults to 40.
+    - bs_size (int, optional): Batch size for nuclei feature extraction. Defaults to 128.
+    - num_workers (int, optional): Number of workers for parallel processing. Defaults to 16.
+    - min_num (int, optional): Minimum number of nuclei required for processing. Defaults to 16.
+    - reverse (bool, optional): If True, processes slides in reverse order. Defaults to False.
+
+    Returns:
+    None
+    """
     slide_id_li = glob.glob(f'{datadir}/*')
     slide_id_li = [os.path.basename(slide_id) for slide_id in slide_id_li]
     slide_id_li = [os.path.splitext(slide_id)[0] for slide_id in slide_id_li]
