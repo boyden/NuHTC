@@ -4,12 +4,13 @@
 
 ![](./resources/nuhtc.jpg)
 This repo is the official implementation of NuHTC.
+[Installation](#setup-environment) | [Usage](#usage) | [Model Architecture](#model-architecture) | [Training](#training) | [Evaluation](#evaluation) | [Citation](#citation) | [License](#license)
 
 ## Overlaid Segmentation and Classification Prediction
 The demo may take around 10s to load. 
 ![](./resources/instance_demo.gif)
 
-## 👉 Setup Environment
+[👉 Setup Environment](#setup-environment)
 Setup the Python environment
 
 ```shell script
