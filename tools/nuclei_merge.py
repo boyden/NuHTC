@@ -218,7 +218,7 @@ def parse_args():
     parser = ArgumentParser()
     parser.add_argument("--datadir", help="path to folder containing geojson file")
     parser.add_argument("--geojson_name", help="geojson file name")
-    parser.add_argument("--output_name", default=None, type="str", help="output geojson file name")
+    parser.add_argument("--output_name", default=None, type=str, help="output geojson file name")
     parser.add_argument("--overlap_threshold", type=float, default=0.01, help="area overlap percentage threshold to be removed")
     parser.add_argument("--merge_strategy", default="probability", help="whether to keep the cell with highest probability or largest area, specify 'probability' or 'area'")
     parser.add_argument("--uniform_classification", action="store_true", help="whether to classify all cells uniformly and represent as the same color (yellow)")
