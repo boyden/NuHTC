@@ -159,7 +159,11 @@ Our model is trained with a patch size `256×256` at 40X magnification. During i
 
 ## 🔬 Extract the Nuclei Feature
 Make sure you have successfully installed the [histomicstk](https://digitalslidearchive.github.io/HistomicsTK/).
-We support two approaches for extracting nuclear features. The first extracts a patch centered on each nucleus and then computes features individually. The second divides the whole slide image (WSI) into tiles and extracts nuclear features from each tile sequentially.
+We support two approaches for extracting nuclear features:
+
+1. Extract a patch centered on each nucleus and then compute features individually (recommended).
+
+2. Tile the WSI and extract the nucleus feature from each tile sequentially.
 
 We recommend using the first way. Here is an example:
 ```shell script
