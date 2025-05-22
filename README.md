@@ -109,7 +109,7 @@ This is an example of training NuHTC on the first fold. To train on other folds,
 CUDA_VISIBLE_DEVICES=0 python tools/train.py configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py --no-validate
 ```
 
-Note, recent update (~May 2024, driver version 555.85, 555.99, 556.12) of Nvidia driver may lead to `UnicodeDecodeError: 'utf-8' codec can't decode byte 0xf8 in position 0: invalid start byte` in init wandb package. If your Nvidia driver version is greater than `552.44`, please downgrade to the `Nvidia 552.44 studio driver` or update to a version greater than `560.70` for successfully training the models. For more details, please refer to [wandb issue](https://github.com/wandb/wandb/issues/7683).
+> Note, recent update (~May 2024, driver version 555.85, 555.99, 556.12) of Nvidia driver may lead to `UnicodeDecodeError: 'utf-8' codec can't decode byte 0xf8 in position 0: invalid start byte` in init wandb package. If your Nvidia driver version is greater than `552.44`, please downgrade to the `Nvidia 552.44 studio driver` or update to a version greater than `560.70` for successfully training the models. For more details, please refer to [wandb issue](https://github.com/wandb/wandb/issues/7683).
 
 ## 👉 Test
 ``` shell script
@@ -136,7 +136,7 @@ CUDA_VISIBLE_DEVICES=0 python tools/infer.py demo/imgs configs/nuhtc/htc_lite_sw
 ## 🚀 Segment the Whole Slide Image
 Segment for the WSI with support output versions: `qupath`, `sql`, `dsa`, and `coco`. Do not automatically support various magnifications. (Default: 40X).
 
-(Note: we support the version of both nuclei point and contour for qupath format. COCO is only for storing the patch nuclei segmentation results now.)
+> Note: we support the version of both nuclei point and contour for qupath format. COCO is only for storing the patch nuclei segmentation results now.
 1. WSI Segmentation
 
 ```shell script
