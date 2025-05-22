@@ -1,6 +1,7 @@
 import glob, sys, os, time, json
 import cv2
 import openslide
+import sqlite3
 import warnings
 import numpy as np
 import pandas as pd
@@ -23,10 +24,9 @@ def process_nuclei_batch(rgb_img, nu_mask, nu_info):
         fdf = compute_nuclei_features(im_label=nu_mask.astype(np.uint8), im_nuclei=htx)
     except:
         return None
-    for k in ['label', 'score']:
-        if k in nu_info['properties']:
-            fdf[k] = nu_info['properties'][k]
+    fdf['score'] = nu_info['properties']['score']
     fdf['type'] = nu_info['properties']['classification']['name']
+    fdf['class_id'] = nu_info['properties']['label']
     fdf['nuclei_id'] = nu_info['properties']['nuclei_id']
     fdf[['x_min', 'y_min', 'x_max', 'y_max']] = [nu_info['x_min'], nu_info['y_min'], nu_info['x_max'], nu_info['y_max']]
     return fdf
@@ -49,6 +49,7 @@ def extract_feat(datadir, segdir,
         slide_id_li = slide_id_li[start:end]
     else:
         slide_id_li = slide_id_li[start:]
+    
     for slide_id in slide_id_li:
         print(f'\nprocess: {slide_id}')
         wsi = openslide.open_slide(f'{datadir}/{slide_id}.svs')
@@ -61,28 +62,33 @@ def extract_feat(datadir, segdir,
 
         with open(nu_file_path) as f:
             nu_geojson = json.load(f)
-        
-        if os.path.exists(f'{segdir}/{slide_id}/nuclei_feat.csv'):
-            print(f'load existing features: {slide_id}')
+
+        if os.path.exists(f'{segdir}/{slide_id}/nuclei_feat.db'):
+            table_created = True
+            conn = sqlite3.connect(f'{segdir}/{slide_id}/nuclei_feat.db')
+            cursor = conn.cursor()
+            # Get the list of nuclei_id from the database
+            query = "SELECT nuclei_id FROM nuclei_features"
+            cursor.execute(query)
+
             nu_id_li = [elem['properties']['nuclei_id'] for elem in nu_geojson]
-            nu_id_li_ttp = nu_id_li
-            feat_exists = pd.read_csv(f'{segdir}/{slide_id}/nuclei_feat.csv')
-            nu_id_exists = feat_exists['nuclei_id'].values
-            
-            if len(set(nu_id_exists) ^ set(nu_id_li_ttp)) == 0:
+            nu_id_exists = set(row[0] for row in cursor.fetchall())  # Convert to a set for faster lookup
+            # Filter out elements from nu_geojson that already exist in the database
+            if len(set(nu_id_exists) ^ set(nu_id_li)) == 0:
                 print(f'skipped:{slide_id}\n')
                 continue
             else:
                 print(f'skipped {len(nu_id_exists)} nuclei')
             nu_geojson = [elem for elem in nu_geojson if elem['properties']['nuclei_id'] not in nu_id_exists]
-            ifeatures = feat_exists
         else:
-            os.makedirs(f'{datadir}/nuclei_feat/{slide_id}', exist_ok=True)
-            ifeatures = None
+            table_created = False
+            os.makedirs(f'{segdir}/{slide_id}', exist_ok=True)
+            conn = sqlite3.connect(f'{segdir}/{slide_id}/nuclei_feat.db')
+            cursor = conn.cursor()
 
         bs_len = (len(nu_geojson) + bs_size - 1) // bs_size  # Calculate the number of batches
         for bs_idx in tqdm(range(bs_len)):
-            batches = nu_geojson[bs_idx:bs_idx+bs_size]
+            batches = nu_geojson[bs_idx*bs_size:bs_idx*bs_size+bs_size]
             nu_img_li = []
             nu_mask_li = []
             nu_geojson_li = []
@@ -131,14 +137,26 @@ def extract_feat(datadir, segdir,
                 print(f'skipped batch {bs_idx} of {bs_len}')
                 continue
             fdf = pd.concat(fdf_li, axis=0)
-            if ifeatures is None:
-                ifeatures = fdf
+            fdf.columns = [col.replace('.', '_') for col in fdf.columns]
+
+            if not table_created:
+                columns = fdf.columns
+                # Infer column types from DataFrame dtypes
+                dtype_mapping = {
+                    'int64': 'INTEGER',
+                    'float64': 'REAL',
+                    'object': 'TEXT',
+                    'bool': 'INTEGER',
+                    'datetime64[ns]': 'TEXT'
+                }
+                column_definitions = ", ".join([
+                    f"{col} {dtype_mapping.get(str(fdf[col].dtype), 'TEXT')}" for col in fdf.columns
+                ])
+                cursor.execute(f"CREATE TABLE IF NOT EXISTS nuclei_features ({column_definitions})")
+                conn.commit()
+                table_created = True
             else:
-                ifeatures = pd.concat([ifeatures, fdf], axis=0)
-            
-            interval = 10000 // bs_size
-            if (bs_idx + 1) % interval == 0 or bs_idx + 1 == len(batches):
-                ifeatures.to_csv(f'{segdir}/{slide_id}/nuclei_feat.csv', mode='w', index=False)
+                fdf.to_sql('nuclei_features', conn, if_exists='append', index=False)
 
 def parse_args():
     parser = ArgumentParser()
