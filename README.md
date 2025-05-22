@@ -3,7 +3,13 @@
 >  [Bao Li](https://boyden.github.io), et al.
 
 <p align="center">
-[Setup](#-setup-environment) | [Train](#-train) | [Test](#-test) | [Infer](#-infer) | [WSI Segmentation](#-segment-the-whole-slide-image) | [Feature Extraction](#-extract-the-nuclei-feature) | [Citation](#-citation)
+  <a href="#-setup-environment">Setup</a> |
+  <a href="#-train">Train</a> |
+  <a href="#-test">Test</a> |
+  <a href="#-infer">Infer</a> |
+  <a href="#-segment-the-whole-slide-image">WSI Segmentation</a> |
+  <a href="#-extract-the-nuclei-feature">Feature Extraction</a> |
+  <a href="#-citation">Citation</a>
 </p>
 
 ![](./resources/nuhtc.jpg)
