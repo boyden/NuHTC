@@ -1,5 +1,7 @@
 # NuHTC: A Hybrid Task Cascade for Nuclei Instance Segmentation and Classification
 
+>  [Bao Li](https://boyden.github.io), et al.
+
 <p align="center">
   <a href="#-setup-environment">Setup</a> |
   <a href="#-train">Train</a> |
@@ -9,9 +11,6 @@
   <a href="#-extract-the-nuclei-feature">Feature Extraction</a> |
   <a href="#-citation">Citation</a>
 </p>
-
->  [Bao Li](https://boyden.github.io), et al.
-
 ![](./resources/nuhtc.jpg)
 This repo is the official implementation of NuHTC.
 
