@@ -132,6 +132,13 @@ CUDA_VISIBLE_DEVICES=0 python tools/infer_wsi.py demo/wsi configs/nuhtc/htc_lite
 --out demo/wsi_res --patch --seg --stitch --patch_size 256 --step_size 192 --margin 1 --min_area 10 --batch_size 32 \
 --save_dir demo/wsi_infer --mode qupath --no_auto_skip
 ```
+
+After segmentation, mask non-maximum suppression (NMS) is applied to the WSI to remove the overlapping nuclei.
+```shell script
+# The datadir is the directory of the WSI segmentation results, the geojson_name is its corresponding segmentation geojson file name.
+python tools/nuclei_merge.py --datadir demo/wsi_infer/TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724 --geojson_name TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724 --overlap_threshold 0.05 --merge_strategy probability
+```
+
 We provide a WSI example from TCGA (filename: `TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724.svs`), which includes the `geojson` file for both nuclei points and contours. These can be easily dragged into, viewed, and edited using [QuPath](https://qupath.github.io/). The WSI example can be downloaded from [Google Drive](https://drive.google.com/drive/folders/1UdCixl10kBxyKHUGOww4WIkdoFma-UIr?usp=drive_link).
 
 The `dsa` is a format supported by [Digital Slide Archive](https://digitalslidearchive.github.io/digital_slide_archive/), a powerful containerized web-based platform for storing, managing, viewing, and analysing WSIs. If you are interested in using the DSA platform, please refer to its [deployment instructions](https://github.com/DigitalSlideArchive/digital_slide_archive/blob/master/devops/dsa/README.rst).
@@ -139,6 +146,7 @@ The `dsa` is a format supported by [Digital Slide Archive](https://digitalslidea
 Our model is trained with a patch size `256×256` at 40X magnification. During inference, it maintains strong performance even when evaluated with a larger patch size of `512×512`. To run inference using `512×512` patches, please specify the arguments `--patch_size 512 --step_size 448`.
 
 ## 🔬 Extract the Nuclei Feature
+
 Please specify `--mode coco` or `--mode all` during WSI inference. Make sure you have successfully installed the [histomicstk](https://digitalslidearchive.github.io/HistomicsTK/).
 ```shell script
 python tools/nuclei_feat_extract.py demo/wsi_res
@@ -156,6 +164,7 @@ python tools/nuclei_feat_extract.py demo/wsi_res
 # --reverse (flag, default: False)
 # If specified, slide IDs will be processed in reverse order.
 ```
+
 It will extract the nuclei feature for each image and then store them in a csv file. The following is an example for the nuclei feature csv file.
 |     | Label | Identifier.Xmin | Identifier.Ymin | Identifier.Xmax | Identifier.Ymax | Identifier.CentroidX | Identifier.CentroidY | Identifier.WeightedCentroidX | Identifier.WeightedCentroidY | Orientation.Orientation | Size.Area | Size.ConvexHullArea | Size.MajorAxisLength | Size.MinorAxisLength | Size.Perimeter | Shape.Circularity | Shape.Eccentricity | Shape.EquivalentDiameter | Shape.Extent | Shape.FractalDimension | Shape.MinorMajorAxisRatio | Shape.Solidity | Shape.HuMoments1 | Shape.HuMoments2 | Shape.HuMoments3 | Shape.HuMoments4 | Shape.HuMoments5 | Shape.HuMoments6 | Shape.HuMoments7 | Shape.WeightedHuMoments1 | Shape.WeightedHuMoments2 | Shape.WeightedHuMoments3 | Shape.WeightedHuMoments4 | Shape.WeightedHuMoments5 | Shape.WeightedHuMoments6 | Shape.WeightedHuMoments7 | Shape.FSD1 | Shape.FSD2 | Shape.FSD3 | Shape.FSD4 | Shape.FSD5 | Shape.FSD6 | Nucleus.Intensity.Min | Nucleus.Intensity.Max | Nucleus.Intensity.Mean | Nucleus.Intensity.Median | Nucleus.Intensity.MeanMedianDiff | Nucleus.Intensity.Std | Nucleus.Intensity.IQR | Nucleus.Intensity.MAD | Nucleus.Intensity.Skewness | Nucleus.Intensity.Kurtosis | Nucleus.Intensity.HistEnergy | Nucleus.Intensity.HistEntropy | Nucleus.Gradient.Mag.Mean | Nucleus.Gradient.Mag.Std | Nucleus.Gradient.Mag.Skewness | Nucleus.Gradient.Mag.Kurtosis | Nucleus.Gradient.Mag.HistEntropy | Nucleus.Gradient.Mag.HistEnergy | Nucleus.Gradient.Canny.Sum | Nucleus.Gradient.Canny.Mean | Nucleus.Haralick.ASM.Mean | Nucleus.Haralick.ASM.Range | Nucleus.Haralick.Contrast.Mean | Nucleus.Haralick.Contrast.Range | Nucleus.Haralick.Correlation.Mean | Nucleus.Haralick.Correlation.Range | Nucleus.Haralick.SumOfSquares.Mean | Nucleus.Haralick.SumOfSquares.Range | Nucleus.Haralick.IDM.Mean | Nucleus.Haralick.IDM.Range | Nucleus.Haralick.SumAverage.Mean | Nucleus.Haralick.SumAverage.Range | Nucleus.Haralick.SumVariance.Mean | Nucleus.Haralick.SumVariance.Range | Nucleus.Haralick.SumEntropy.Mean | Nucleus.Haralick.SumEntropy.Range | Nucleus.Haralick.Entropy.Mean | Nucleus.Haralick.Entropy.Range | Nucleus.Haralick.DifferenceVariance.Mean | Nucleus.Haralick.DifferenceVariance.Range | Nucleus.Haralick.DifferenceEntropy.Mean | Nucleus.Haralick.DifferenceEntropy.Range | Nucleus.Haralick.IMC1.Mean | Nucleus.Haralick.IMC1.Range | Nucleus.Haralick.IMC2.Mean | Nucleus.Haralick.IMC2.Range | cell_type | img_id | img_type | img_objs | file_name |
 |-----|-------|-----------------|-----------------|-----------------|-----------------|----------------------|----------------------|------------------------------|------------------------------|-------------------------|-----------|---------------------|----------------------|----------------------|----------------|-------------------|--------------------|--------------------------|--------------|------------------------|---------------------------|----------------|------------------|------------------|------------------|------------------|------------------|------------------|------------------|--------------------------|--------------------------|--------------------------|--------------------------|--------------------------|--------------------------|--------------------------|------------|------------|------------|------------|------------|------------|-----------------------|-----------------------|------------------------|--------------------------|----------------------------------|-----------------------|-----------------------|-----------------------|----------------------------|----------------------------|------------------------------|-------------------------------|---------------------------|--------------------------|-------------------------------|-------------------------------|----------------------------------|---------------------------------|----------------------------|-----------------------------|---------------------------|----------------------------|--------------------------------|---------------------------------|-----------------------------------|------------------------------------|------------------------------------|-------------------------------------|---------------------------|----------------------------|----------------------------------|-----------------------------------|-----------------------------------|------------------------------------|----------------------------------|-----------------------------------|-------------------------------|--------------------------------|------------------------------------------|-------------------------------------------|-----------------------------------------|------------------------------------------|----------------------------|-----------------------------|----------------------------|-----------------------------|-----------|--------|----------|----------|-----------|
@@ -167,7 +176,7 @@ It will extract the nuclei feature for each image and then store them in a csv f
 
 
 ## 🗓️ Ongoing
-- [ ] Merge overlap nuclei when segmenting the WSI
+- ✅ Merge overlapping nuclei when segmenting the WSI
 
 ## 📖 Citation
 ```
