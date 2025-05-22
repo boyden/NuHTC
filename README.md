@@ -5,7 +5,7 @@
 ![](./resources/nuhtc.jpg)
 This repo is the official implementation of NuHTC.
 
-[Setup](#-setup-environment) | [Train](#-train) | [Test](#-test) | [Infer](#-infer) | [WSI Segmentation](#-segment-the-whole-slide-image) | [Nuclei Feature Extraction](#-extract-the-nuclei-feature) | [Citation](#-citation)
+[Setup](#-setup-environment) | [Train](#-train) | [Test](#-test) | [Infer](#-infer) | [WSI Segmentation](#-segment-the-whole-slide-image) | [Feature Extraction](#-extract-the-nuclei-feature) | [Citation](#-citation)
 
 ## Overlaid Segmentation and Classification Prediction
 The demo may take around 10s to load. 
@@ -157,7 +157,7 @@ We recommend using the first way. Here is an example:
 # segdir is the path to the folder containing segmentation files
 python tools/wsi_feat_extract.py demo/wsi --segdir demo/wsi_res
 ```
-For the second way that tile the images first, please specify `--mode coco` or `--mode all` during WSI inference.
+For the second way that tiles images first, please specify `--mode coco` or `--mode all` during WSI inference.
 ```shell script
 python tools/nuclei_feat_extract.py demo/wsi_res
 # datadir (str)
@@ -170,7 +170,7 @@ python tools/nuclei_feat_extract.py demo/wsi_res
 # --min_num (int, default: 8)
 # Minimum number of nuclei required in a patch. Patches with fewer nuclei will be excluded.
 # --patch_size (int, default: 512)
-# Size (in pixels) of each image patch. Should match the expected input size (e.g. 256 or 512 for 40X resolution) used during inference.
+# Size (in pixels) of each image patch. Should match the expected input size (e.g., 256 or 512 for 40X resolution) used during inference.
 # --reverse (flag, default: False)
 # If specified, slide IDs will be processed in reverse order.
 ```
