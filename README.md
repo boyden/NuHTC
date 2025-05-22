@@ -10,7 +10,7 @@ This repo is the official implementation of NuHTC.
 The demo may take around 10s to load. 
 ![](./resources/instance_demo.gif)
 
-[👉 Setup Environment](#setup-environment)
+## 👉 Setup Environment
 Setup the Python environment
 
 ```shell script
