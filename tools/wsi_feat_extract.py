@@ -135,8 +135,9 @@ def extract_feat(datadir, segdir,
                 ifeatures = fdf
             else:
                 ifeatures = pd.concat([ifeatures, fdf], axis=0)
-
-            if (bs_idx + 1)*bs_size % 10000 == 0 or bs_idx + 1 == len(batches):
+            
+            interval = 10000 // bs_size
+            if (bs_idx + 1) % interval == 0 or bs_idx + 1 == len(batches):
                 ifeatures.to_csv(f'{segdir}/{slide_id}/nuclei_feat.csv', mode='w', index=False)
 
 def parse_args():
