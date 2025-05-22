@@ -185,7 +185,10 @@ def main():
                             overlap_threshold=args.overlap_threshold, 
                             merge_strategy=args.merge_strategy, 
                             uniform_classification=args.uniform_classification)
-    output_path = f"{datadir}/{geojson_name}_{args.merge_strategy}_processed_{args.overlap_threshold}_unif_{args.uniform_classification}.geojson"
+    if args.output_name:
+        output_path = f"{datadir}/{args.output_name}.geojson"
+    else:
+        output_path = f"{datadir}/{geojson_name}_merged.geojson"
 
     # Convert each row into a GeoJSON Feature
     print('Converting to geojson...')
@@ -215,6 +218,7 @@ def parse_args():
     parser = ArgumentParser()
     parser.add_argument("--datadir", help="path to folder containing geojson file")
     parser.add_argument("--geojson_name", help="geojson file name")
+    parser.add_argument("--output_name", default=None, type="str", help="output geojson file name")
     parser.add_argument("--overlap_threshold", type=float, default=0.01, help="area overlap percentage threshold to be removed")
     parser.add_argument("--merge_strategy", default="probability", help="whether to keep the cell with highest probability or largest area, specify 'probability' or 'area'")
     parser.add_argument("--uniform_classification", action="store_true", help="whether to classify all cells uniformly and represent as the same color (yellow)")
