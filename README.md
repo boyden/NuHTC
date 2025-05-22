@@ -136,7 +136,9 @@ CUDA_VISIBLE_DEVICES=0 python tools/infer_wsi.py demo/wsi configs/nuhtc/htc_lite
 After segmentation, mask non-maximum suppression (NMS) is applied to the WSI to remove the overlapping nuclei.
 ```shell script
 # The datadir is the directory of the WSI segmentation results, the geojson_name is its corresponding segmentation geojson file name.
-python tools/nuclei_merge.py --datadir demo/wsi_infer/TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724 --geojson_name TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724 --overlap_threshold 0.05 --merge_strategy probability
+python tools/nuclei_merge.py --datadir demo/wsi_res/TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724 \
+--geojson_name TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724 \
+--overlap_threshold 0.05 --merge_strategy probability
 ```
 
 We provide a WSI example from TCGA (filename: `TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724.svs`), which includes the `geojson` file for both nuclei points and contours. These can be easily dragged into, viewed, and edited using [QuPath](https://qupath.github.io/). The WSI example can be downloaded from [Google Drive](https://drive.google.com/drive/folders/1UdCixl10kBxyKHUGOww4WIkdoFma-UIr?usp=drive_link).
@@ -146,8 +148,16 @@ The `dsa` is a format supported by [Digital Slide Archive](https://digitalslidea
 Our model is trained with a patch size `256×256` at 40X magnification. During inference, it maintains strong performance even when evaluated with a larger patch size of `512×512`. To run inference using `512×512` patches, please specify the arguments `--patch_size 512 --step_size 448`.
 
 ## 🔬 Extract the Nuclei Feature
+Make sure you have successfully installed the [histomicstk](https://digitalslidearchive.github.io/HistomicsTK/).
+We support two approaches for extracting nuclear features. The first extracts a patch centered on each nucleus and then computes features individually. The second divides the whole slide image (WSI) into tiles and extracts nuclear features from each tile sequentially.
 
-Please specify `--mode coco` or `--mode all` during WSI inference. Make sure you have successfully installed the [histomicstk](https://digitalslidearchive.github.io/HistomicsTK/).
+We recommend using the first way. Here is an example:
+```shell script
+# demo/wsi is the path to the folder containing raw WSI image files
+# segdir is the path to folder containing segmentation files
+python tools/wsi_feat_extract.py demo/wsi --segdir demo/wsi_res
+```
+For the second way that tile the images first, please specify `--mode coco` or `--mode all` during WSI inference.
 ```shell script
 python tools/nuclei_feat_extract.py demo/wsi_res
 # datadir (str)
