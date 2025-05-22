@@ -12,8 +12,7 @@ Note: Boundary/margin cells already removed, input to merge_overlap() is cleaned
     --datadir demo/wsi_infer/TCGA-AC-A2FK \
     --geojson_name TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724 \
     --overlap_threshold 0.05 \
-    --merge_strategy probability \
-    --uniform_classification
+    --merge_strategy probability
 
 @output processed geojson file
 '''
