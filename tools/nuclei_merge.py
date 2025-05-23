@@ -1,16 +1,14 @@
 '''
 Note: Boundary/margin cells already removed, input to merge_overlap() is cleaned cells list / df
 
-@input --datadir: Path to folder containing geojson file
-@input --geojson_name: Geojson file name
+@input --geojson_name: Geojson file path
 @input --overlap_threshold: Area overlap percentage threshold to be removed
 @input --merge_strategy: Whether to keep the cell with highest probability or largest area, specify 'probability' or 'area' 
 @input --uniform_classification: Whether to classify all cells uniformly and represent as the same color (yellow)
 
     Example call:
     python tools/nuclei_merge.py \
-    --datadir demo/wsi_infer/TCGA-AC-A2FK \
-    --geojson_name TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724 \
+    --geojson_name demo/wsi_infer/TCGA-AC-A2FK/TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724.geojson \
     --overlap_threshold 0.05 \
     --merge_strategy probability
 
@@ -86,7 +84,7 @@ def merge_overlap(cleaned_edge_cells: pd.DataFrame, overlap_threshold=0.01, merg
     print('Starting overlap removal...')
     batch_size = 20480
     worker_count = 8
-    for iteration in range(20):
+    for iteration in range(1):
         print(f'Iteration {iteration}')
 
         num_batches = (len(merged_cells) + batch_size - 1) // batch_size
@@ -104,31 +102,6 @@ def merge_overlap(cleaned_edge_cells: pd.DataFrame, overlap_threshold=0.01, merg
                     poly_list.append(poly)
                     poly_uid_map[poly] = idx
                     uid_poly_map[idx] = poly
-    
-        # poly_list, poly_uid_map, uid_poly_map = [], {}, {}
-
-        # for idx, cell_info in tqdm(merged_cells.iterrows(), total=len(merged_cells)):
-            
-        #     poly = Polygon(cell_info['geometry']['coordinates'][0])
-            
-        #     if not poly.is_valid:
-        #         # print("Found invalid polygon - Fixing with buffer 0")
-        #         multi = poly.buffer(0)
-        #         if isinstance(multi, MultiPolygon):
-        #             multi_polys = list(multi.geoms)  # Convert to iterable list
-        #             if len(multi_polys) > 1:
-        #                 poly_idx = np.argmax([p.area for p in multi_polys])
-        #                 poly = multi_polys[poly_idx]
-        #                 poly = Polygon(poly)
-        #             else:
-        #                 poly = multi_polys[0]
-        #                 poly = Polygon(poly)
-        #         else:
-        #             poly = Polygon(multi)
-                    
-        #     poly_list.append(poly)
-        #     poly_uid_map[poly] = idx  # store uid 
-        #     uid_poly_map[idx] = poly
 
         # Use an strtree for fast querying
         tree = strtree.STRtree(poly_list)
@@ -168,16 +141,6 @@ def merge_overlap(cleaned_edge_cells: pd.DataFrame, overlap_threshold=0.01, merg
                     # Merging strategy
                     else:
                         if merge_strategy == 'probability':
-                            # scores = []
-                            # for i, p in enumerate(submergers):
-                            #     uid = poly_uid_map[p]
-                            #     props = merged_cells.loc[uid, 'properties']
-                            #     score = props.get('score', 0)
-                            #     scores.append(score)
-                            #     print(f'Submerger {i}: UID = {uid}, Score = {score:.4f}')
-                            # selected_poly_index = int(np.argmax(scores))
-                            # selected_poly = submergers[selected_poly_index]
-                            # selected_uid = poly_uid_map[selected_poly]
                             merged_idx.append(query_uid)
 
                         elif merge_strategy == 'area':
@@ -214,8 +177,8 @@ def merge_overlap(cleaned_edge_cells: pd.DataFrame, overlap_threshold=0.01, merg
 def main():
     
     args = parse_args()
-    datadir = args.datadir
-    geojson_name = args.geojson_name
+    datadir = os.path.dirname(args.geojson)
+    geojson_name = os.path.basename(args.geojson).split('.geojson')[0]
     with open(f'{datadir}/{geojson_name}.geojson', 'r') as f:
         data = json.load(f) # List
 
@@ -257,8 +220,7 @@ def main():
     
 def parse_args():
     parser = ArgumentParser()
-    parser.add_argument("--datadir", help="path to folder containing geojson file")
-    parser.add_argument("--geojson_name", help="geojson file name")
+    parser.add_argument("--geojson", help="geojson file name")
     parser.add_argument("--output_name", default=None, type=str, help="output geojson file name")
     parser.add_argument("--overlap_threshold", type=float, default=0.01, help="area overlap percentage threshold to be removed")
     parser.add_argument("--merge_strategy", default="probability", help="whether to keep the cell with highest probability or largest area, specify 'probability' or 'area'")
