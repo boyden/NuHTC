@@ -149,8 +149,8 @@ CUDA_VISIBLE_DEVICES=0 python tools/infer_wsi.py demo/wsi configs/nuhtc/htc_lite
 After segmentation, mask non-maximum suppression (NMS) is applied to the WSI to remove the overlapping nuclei.
 ```shell script
 # The datadir is the directory of the WSI segmentation results, the geojson_name is its corresponding segmentation geojson file name.
-python tools/nuclei_merge.py --datadir demo/wsi_res/TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724 \
---geojson_name TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724 \
+python tools/nuclei_merge.py \
+--geojson demo/wsi_res/TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724.geojson \
 --overlap_threshold 0.05 --merge_strategy probability
 ```
 
