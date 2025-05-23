@@ -32,9 +32,33 @@ from shapely import strtree
 from shapely.geometry import MultiPolygon, Polygon
 from shapely.errors import ShapelyDeprecationWarning
 from collections import deque
+from multiprocessing import Pool
 
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
+def process_batch(batch_df):
+    results = []
+    for idx, row in batch_df.iterrows():
+        poly = Polygon(row['geometry']['coordinates'][0])
+
+        if not poly.is_valid:
+            # print("Found invalid polygon - Fixing with buffer 0")
+            multi = poly.buffer(0)
+            if isinstance(multi, MultiPolygon):
+                multi_polys = list(multi.geoms)  # Convert to iterable list
+                if len(multi_polys) > 1:
+                    poly_idx = np.argmax([p.area for p in multi_polys])
+                    poly = multi_polys[poly_idx]
+                    poly = Polygon(poly)
+                else:
+                    poly = multi_polys[0]
+                    poly = Polygon(poly)
+            else:
+                poly = Polygon(multi)
+
+        results.append((idx, poly))
+
+    return results
 
 ## Base code: CellViT++, adapted for NuHTC
 def merge_overlap(cleaned_edge_cells: pd.DataFrame, overlap_threshold=0.01, merge_strategy='probability', uniform_classification=False) -> pd.DataFrame:
@@ -55,41 +79,56 @@ def merge_overlap(cleaned_edge_cells: pd.DataFrame, overlap_threshold=0.01, merg
     """
     
     start_time = time.time()
-    cleaned_edge_cells = pd.DataFrame(cleaned_edge_cells)
-    merged_cells = cleaned_edge_cells.copy()
+    merged_cells = pd.DataFrame(cleaned_edge_cells)
     merged_cells['score'] = merged_cells['properties'].apply(lambda x: x.get('score', 0))
     merged_cells = merged_cells.sort_values(by='score', ascending=False).reset_index(drop=True)
 
     print('Starting overlap removal...')
-
+    batch_size = 20480
+    worker_count = 8
     for iteration in range(20):
         print(f'Iteration {iteration}')
-        poly_list = []
-        poly_uid_map = {} # key is poly, value is uid
-        uid_poly_map = {} # key is uid, value is poly
 
-        for idx, cell_info in tqdm(merged_cells.iterrows(), total=len(merged_cells)):
+        num_batches = (len(merged_cells) + batch_size - 1) // batch_size
+
+        poly_list, poly_uid_map, uid_poly_map = [], {}, {}
+        for i in tqdm(range(num_batches)):
+            batch_df = merged_cells.iloc[i * batch_size : (i + 1) * batch_size]
+            indices = np.array_split(range(len(batch_df)), worker_count)
+            split_batches = [batch_df.iloc[idx] for idx in indices]
+            with Pool(processes=worker_count) as pool:
+                batch_result = pool.map(process_batch, split_batches)
+    
+            for result in batch_result:
+                for idx, poly in result:
+                    poly_list.append(poly)
+                    poly_uid_map[poly] = idx
+                    uid_poly_map[idx] = poly
+    
+        # poly_list, poly_uid_map, uid_poly_map = [], {}, {}
+
+        # for idx, cell_info in tqdm(merged_cells.iterrows(), total=len(merged_cells)):
             
-            poly = Polygon(cell_info['geometry']['coordinates'][0])
+        #     poly = Polygon(cell_info['geometry']['coordinates'][0])
             
-            if not poly.is_valid:
-                # print("Found invalid polygon - Fixing with buffer 0")
-                multi = poly.buffer(0)
-                if isinstance(multi, MultiPolygon):
-                    multi_polys = list(multi.geoms)  # Convert to iterable list
-                    if len(multi_polys) > 1:
-                        poly_idx = np.argmax([p.area for p in multi_polys])
-                        poly = multi_polys[poly_idx]
-                        poly = Polygon(poly)
-                    else:
-                        poly = multi_polys[0]
-                        poly = Polygon(poly)
-                else:
-                    poly = Polygon(multi)
+        #     if not poly.is_valid:
+        #         # print("Found invalid polygon - Fixing with buffer 0")
+        #         multi = poly.buffer(0)
+        #         if isinstance(multi, MultiPolygon):
+        #             multi_polys = list(multi.geoms)  # Convert to iterable list
+        #             if len(multi_polys) > 1:
+        #                 poly_idx = np.argmax([p.area for p in multi_polys])
+        #                 poly = multi_polys[poly_idx]
+        #                 poly = Polygon(poly)
+        #             else:
+        #                 poly = multi_polys[0]
+        #                 poly = Polygon(poly)
+        #         else:
+        #             poly = Polygon(multi)
                     
-            poly_list.append(poly)
-            poly_uid_map[poly] = idx  # store uid 
-            uid_poly_map[idx] = poly
+        #     poly_list.append(poly)
+        #     poly_uid_map[poly] = idx  # store uid 
+        #     uid_poly_map[idx] = poly
 
         # Use an strtree for fast querying
         tree = strtree.STRtree(poly_list)
