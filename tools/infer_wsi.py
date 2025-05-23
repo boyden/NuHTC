@@ -125,7 +125,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
                   use_default_params = False,
                   seg = False, save_mask = True,
                   stitch= False,
-                  patch = False, auto_skip=True, process_list = None):
+                  patch = False, no_auto_skip=False, process_list = None):
 
 
 
@@ -166,7 +166,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
         df.loc[idx, 'process'] = 0
         slide_id, _ = os.path.splitext(slide)
 
-        if auto_skip and os.path.isfile(os.path.join(patch_save_dir, slide_id + '.h5')):
+        if not no_auto_skip and os.path.isfile(os.path.join(patch_save_dir, slide_id + '.h5')):
             print('{} already exist in destination location, skipped'.format(slide_id))
             df.loc[idx, 'status'] = 'already_exist'
             continue
@@ -311,12 +311,6 @@ def parse_args():
         action="store_true",
         help="whether to set async options for async inference.",
     )
-    parser.add_argument(
-        "--output",
-        type=str,
-        default=None,
-        help="specify the file to skip.",
-    )
     parser.add_argument('--step_size', type = int, default=256,
                         help='step_size')
     parser.add_argument('--patch_size', type = int, default=256,
@@ -324,7 +318,7 @@ def parse_args():
     parser.add_argument('--patch', default=False, action='store_true')
     parser.add_argument('--seg', default=False, action='store_true')
     parser.add_argument('--stitch', default=False, action='store_true')
-    parser.add_argument('--no_auto_skip', default=True, action='store_false')
+    parser.add_argument('--no_auto_skip', default=False, action='store_true')
     parser.add_argument('--save_dir', type = str,
                         help='directory to save processed data')
     parser.add_argument('--preset', default=None, type=str,
@@ -361,7 +355,6 @@ def main():
 
     if args.process_list:
         process_list = os.path.join(args.save_dir, args.process_list)
-
     else:
         process_list = None
 
@@ -414,6 +407,7 @@ def main():
     for test_pipe in cfg['data']['test']['pipeline']:
         if test_pipe['type'] == 'MultiScaleFlipAug':
             test_pipe['scale_factor'] = float(80/args.mag)
+            print('scale_factor: ', test_pipe['scale_factor'])
 
     # build the model from a config file and a checkpoint file
     model = init_detector(cfg, args.checkpoint, device=args.device)
@@ -433,7 +427,7 @@ def main():
                                             seg=args.seg, use_default_params=False, save_mask=True,
                                             stitch=args.stitch,
                                             patch_level=args.patch_level, patch=args.patch,
-                                            process_list=process_list, auto_skip=args.no_auto_skip)
+                                            process_list=process_list, no_auto_skip=args.no_auto_skip)
 
     csv_path = f'{args.save_dir}/process_list_autogen.csv'
     bags_dataset = Dataset_All_Bags(csv_path)
@@ -447,17 +441,12 @@ def main():
         print('\nprogress: {}/{}'.format(bag_candidate_idx, total))
         print(slide_id)
 
-        if not args.no_auto_skip and slide_id+'.pt' in args.output:
-            print('skipped {}'.format(slide_id))
-            continue
-
         wsi = openslide.open_slide(slide_file_path)
         wsi_shape = wsi.level_dimensions[0]
-        dataset = Whole_Slide_Bag_FP(file_path=h5_file_path, wsi=wsi, pretrained=False, transform=False,
-            custom_downsample=1, target_patch_size=-1)
-        coords = []
-        # os.makedirs(f'{args.save_dir}/{slide_id}/img', exist_ok=True)
-        os.makedirs(f'{args.save_dir}/{slide_id}/infer', exist_ok=True)
+        dataset = Whole_Slide_Bag_FP(file_path=h5_file_path, wsi=wsi, 
+                            pretrained=False, transform=False,
+                            custom_downsample=1, target_patch_size=-1)
+
         infer_dataloader = DataLoader(dataset, batch_size=batch_size, num_workers=args.num_workers)
         geojson_li = []
         pointjson_li = []
@@ -493,6 +482,7 @@ def main():
                 if len(seg_mask[mask_id]) == 0:
                     continue
                 if args.det:
+                    os.makedirs(f'{args.save_dir}/{slide_id}/infer', exist_ok=True)
                     save_result(
                         model,
                         img[mask_id],
