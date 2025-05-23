@@ -141,8 +141,8 @@ Segment for the WSI with support output versions: `qupath`, `sql`, `dsa`, and `c
 
 ```shell script
 CUDA_VISIBLE_DEVICES=0 python tools/infer_wsi.py demo/wsi configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py models/pannuke.pth \
---patch --seg --stitch --patch_size 256 --step_size 192 --margin 1 --min_area 10 --batch_size 32 \
---save_dir demo/wsi_infer --mode qupath --no_auto_skip
+--patch --seg --stitch --no_auto_skip --patch_size 256 --step_size 192 --margin 1 --min_area 10 \
+--batch_size 32 --save_dir demo/wsi_infer --mode qupath
 ```
 2. Merge Overlapping Nuclei
 
