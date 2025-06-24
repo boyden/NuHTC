@@ -438,6 +438,7 @@ def main():
         bag_name = slide_id+'.h5'
         h5_file_path = os.path.join(args.save_dir, 'patches', bag_name)
         slide_file_path = os.path.join(args.source, slide_id+args.slide_ext)
+        os.makedirs(f"{args.save_dir}/{slide_id}", exists=True)
         print('\nprogress: {}/{}'.format(bag_candidate_idx, total))
         print(slide_id)
 
