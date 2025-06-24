@@ -438,7 +438,7 @@ def main():
         bag_name = slide_id+'.h5'
         h5_file_path = os.path.join(args.save_dir, 'patches', bag_name)
         slide_file_path = os.path.join(args.source, slide_id+args.slide_ext)
-        os.makedirs(f"{args.save_dir}/{slide_id}", exist_ok=True)
+        os.makedirs(f"{args.save_dir}/nuclei/{slide_id}", exist_ok=True)
         print('\nprogress: {}/{}'.format(bag_candidate_idx, total))
         print(slide_id)
 
@@ -643,12 +643,12 @@ def main():
 
             if idx % 5000 == 0 or idx == len(infer_dataloader) - 1:
                 if args.mode == 'qupath' or args.mode == 'all':
-                    with open(f'{args.save_dir}/{slide_id}/{slide_id}.geojson', 'w') as f:
+                    with open(f'{args.save_dir}/nuclei/{slide_id}/{slide_id}.geojson', 'w') as f:
                         json.dump(geojson_li, f)
-                    with open(f'{args.save_dir}/{slide_id}/{slide_id}_point.geojson', 'w') as f:
+                    with open(f'{args.save_dir}/nuclei/{slide_id}/{slide_id}_point.geojson', 'w') as f:
                         json.dump(pointjson_li, f)
                 if args.mode == 'dsa' or args.mode == 'all':
-                    with open(f'{args.save_dir}/{slide_id}/{slide_id}_dsa.json', 'w') as f:
+                    with open(f'{args.save_dir}/nuclei/{slide_id}/{slide_id}_dsa.json', 'w') as f:
                         dsajson_file = {
                             'description': 'Seg with NuHTC automatically',
                             'elements': dsajson_li,
@@ -661,12 +661,12 @@ def main():
                                         'annotations': annt_li,
                                         'categories': main_cls_arr
                                         }
-                    with open(f'{args.save_dir}/{slide_id}/coco_nuclei.json', 'w') as f:
+                    with open(f'{args.save_dir}/nuclei/{slide_id}/coco_nuclei.json', 'w') as f:
                         json.dump(nuclei_annt_json, f)
                 if args.mode == 'sql' or args.mode == 'all':
                     conn.commit()
                     conn.close()
-                    conn = sqlite3.connect(f'{args.save_dir}/{slide_id}/{slide_id}_dql.db')
+                    conn = sqlite3.connect(f'{args.save_dir}/nuclei/{slide_id}/{slide_id}_dql.db')
                     c = conn.cursor()
                     if idx == len(infer_dataloader) - 1:
                         c.execute('''DROP TABLE IF EXISTS rtree;''')
