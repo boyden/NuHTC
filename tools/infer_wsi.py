@@ -437,6 +437,8 @@ def main():
         slide_id = bags_dataset[bag_candidate_idx].split(args.slide_ext)[0]
         bag_name = slide_id+'.h5'
         h5_file_path = os.path.join(args.save_dir, 'patches', bag_name)
+        if not os.path.exists(h5_file_path):
+            print(f'\nskip {slide_id} due to no coord file')
         slide_file_path = os.path.join(args.source, slide_id+args.slide_ext)
         os.makedirs(f"{args.save_dir}/nuclei/{slide_id}", exist_ok=True)
         print('\nprogress: {}/{}'.format(bag_candidate_idx, total))
