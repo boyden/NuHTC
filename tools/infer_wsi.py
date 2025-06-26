@@ -108,7 +108,6 @@ def patching(WSI_object, **kwargs):
     # Patch
     file_path = WSI_object.process_contours(**kwargs)
 
-
     ### Stop Patch Timer
     patch_time_elapsed = time.time() - start_time
     return file_path, patch_time_elapsed
@@ -255,11 +254,19 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 
         seg_time_elapsed = -1
         if seg:
+            fg_mask_path = f'{save_dir}/foregrounds/{slide_id}.png'
+            if os.path.exists(fg_mask_path):
+                print('mask for {} already exists, skipping segmentation'.format(slide_id))
+                img_otsu = Image.open(fg_mask_path)
+                img_otsu = (np.array(img_otsu) > 0).astype(np.uint8)
+            else:
+                img_otsu = None
+            current_seg_params.update({'img_otsu': img_otsu})
             WSI_object, seg_time_elapsed = segment(WSI_object, current_seg_params, current_filter_params)
 
         if save_mask:
             mask = WSI_object.visWSI(**current_vis_params)
-            mask_path = os.path.join(mask_save_dir, slide_id+'.jpg')
+            mask_path = os.path.join(mask_save_dir, slide_id+'.png')
             mask.save(mask_path)
 
         patch_time_elapsed = -1 # Default time

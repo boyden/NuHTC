@@ -102,7 +102,7 @@ class WholeSlideImage(object):
         asset_dict = {'holes': self.holes_tissue, 'tissue': self.contours_tissue}
         save_pkl(mask_file, asset_dict)
 
-    def segmentTissue(self, seg_level=0, sthresh=20, sthresh_up = 255, mthresh=7, close = 0, use_otsu=False, 
+    def segmentTissue(self, seg_level=0, sthresh=20, sthresh_up=255, mthresh=7, close=0, use_otsu=False, img_otsu=None, 
                             filter_params={'a_t':100}, ref_patch_size=512, exclude_ids=[], keep_ids=[]):
         """
             Segment the tissue via HSV -> Median thresholding -> Binary threshold
@@ -155,29 +155,32 @@ class WholeSlideImage(object):
                 hole_contours.append(filtered_holes)
 
             return foreground_contours, hole_contours
-        
-        img = np.array(self.wsi.read_region((0,0), seg_level, self.level_dim[seg_level]))
-        img_hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)  # Convert to HSV space
-        img_med = cv2.medianBlur(img_hsv[:,:,1], mthresh)  # Apply median blurring
-        
-       
-        # Thresholding
-        if use_otsu:
-            _, img_otsu = cv2.threshold(img_med, 0, sthresh_up, cv2.THRESH_OTSU+cv2.THRESH_BINARY)
-        else:
-            _, img_otsu = cv2.threshold(img_med, sthresh, sthresh_up, cv2.THRESH_BINARY)
+        print(f"Segmenting tissue for: {self.name} at level: {seg_level} with size: {self.level_dim[seg_level]}...")
+        if img_otsu is None:
+            img = np.array(self.wsi.read_region((0,0), seg_level, self.level_dim[seg_level]))
+            img_hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)  # Convert to HSV space
+            img_med = cv2.medianBlur(img_hsv[:,:,1], mthresh)  # Apply median blurring
 
-        # Morphological closing
-        if close > 0:
-            kernel = np.ones((close, close), np.uint8)
-            img_otsu = cv2.morphologyEx(img_otsu, cv2.MORPH_CLOSE, kernel)                 
+            # Thresholding
+            if use_otsu:
+                _, img_otsu = cv2.threshold(img_med, 0, sthresh_up, cv2.THRESH_OTSU+cv2.THRESH_BINARY)
+            else:
+                _, img_otsu = cv2.threshold(img_med, sthresh, sthresh_up, cv2.THRESH_BINARY)
+
+            # Morphological closing
+            if close > 0:
+                kernel = np.ones((close, close), np.uint8)
+                img_otsu = cv2.morphologyEx(img_otsu, cv2.MORPH_CLOSE, kernel)
+        else:
+            img_otsu = cv2.resize(img_otsu, self.level_dim[seg_level], interpolation=cv2.INTER_NEAREST)
 
         scale = self.level_downsamples[seg_level]
-        scaled_ref_patch_area = int(ref_patch_size**2 / (scale[0] * scale[1]))
+        scaled_ref_patch_area = round(ref_patch_size/scale[0])
         filter_params = filter_params.copy()
         filter_params['a_t'] = filter_params['a_t'] * scaled_ref_patch_area
         filter_params['a_h'] = filter_params['a_h'] * scaled_ref_patch_area
-        
+        print(f"Filter parameters: {filter_params}")
+
         # Find and filter contours
         contours, hierarchy = cv2.findContours(img_otsu, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE) # Find contours 
         hierarchy = np.squeeze(hierarchy, axis=(0,))[:, 2:]

@@ -83,7 +83,7 @@ def merge_overlap(cleaned_edge_cells: pd.DataFrame, overlap_threshold=0.01, merg
 
     print('Starting overlap removal...')
     batch_size = 20480
-    worker_count = 8
+    worker_count = 16
     for iteration in range(1):
         print(f'Iteration {iteration}')
 
