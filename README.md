@@ -172,7 +172,7 @@ We recommend using the first way. Here is an example:
 ```shell script
 # demo/wsi is the path to the folder containing raw WSI image files
 # segdir is the path to the folder containing segmentation files
-python tools/wsi_feat_extract.py demo/wsi --segdir demo/wsi_res
+python tools/wsi_feat_extract.py demo/wsi --segdir demo/wsi_res --mag 40
 ```
 For the second way that tiles images first, please specify `--mode coco` or `--mode all` during WSI inference.
 ```shell script
