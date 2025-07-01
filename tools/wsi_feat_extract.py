@@ -91,9 +91,9 @@ def collate_fn(batch):
 # ignore histomicstk/features/compute_morphometry_features.py:147: RankWarning: Polyfit may be poorly conditioned
 
 def process_nuclei_batch(rgb_img, nu_mask, nu_info):
-    stains, _, _ = color_deconvolution_routine(rgb_img)
-    htx = 255 - stains[..., 0]
     try:
+        stains, _, _ = color_deconvolution_routine(rgb_img)
+        htx = 255 - stains[..., 0]
         fdf = compute_nuclei_features(im_label=nu_mask.astype(np.uint8), im_nuclei=htx)
     except:
         return None
