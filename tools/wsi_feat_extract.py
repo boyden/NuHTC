@@ -91,9 +91,9 @@ def collate_fn(batch):
 # ignore histomicstk/features/compute_morphometry_features.py:147: RankWarning: Polyfit may be poorly conditioned
 
 def process_nuclei_batch(rgb_img, nu_mask, nu_info):
-    stains, _, _ = color_deconvolution_routine(rgb_img)
-    htx = 255 - stains[..., 0]
     try:
+        stains, _, _ = color_deconvolution_routine(rgb_img)
+        htx = 255 - stains[..., 0]
         fdf = compute_nuclei_features(im_label=nu_mask.astype(np.uint8), im_nuclei=htx)
     except:
         return None
@@ -140,8 +140,8 @@ def extract_feat(datadir, segdir,
     else:
         slide_id_li = slide_id_li[start:]
     
-    for slide_id in slide_id_li:
-        print(f'\nprocess: {slide_id}')
+    for idx, slide_id in enumerate(slide_id_li):
+        print(f'\n[{idx+1}/{len(slide_id_li)}]process: {slide_id}')
         nu_file_path = f'{segdir}/{slide_id}/{slide_id}_merged.geojson'
         if not os.path.exists(nu_file_path):
             print(f'not found {slide_id}, skipped\n')
