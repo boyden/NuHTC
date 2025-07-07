@@ -217,7 +217,6 @@ def extract_feat(datadir, segdir,
             fdf.columns = [col.replace('.', '_') for col in fdf.columns]
 
             if not table_created:
-                columns = fdf.columns
                 # Infer column types from DataFrame dtypes
                 dtype_mapping = {
                     'int64': 'INTEGER',
@@ -232,8 +231,9 @@ def extract_feat(datadir, segdir,
                 cursor.execute(f"CREATE TABLE IF NOT EXISTS nuclei_features ({column_definitions})")
                 conn.commit()
                 table_created = True
-            else:
-                fdf.to_sql('nuclei_features', conn, if_exists='append', index=False)
+                
+            # Add batch nuclei features to table
+            fdf.to_sql('nuclei_features', conn, if_exists='append', index=False)
 
 def parse_args():
     parser = ArgumentParser()
