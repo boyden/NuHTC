@@ -175,7 +175,8 @@ def extract_feat(datadir, segdir,
                     print(f'skipped:{slide_id}\n')
                     continue
                 else:
-                    print(f'skipped {len(nu_id_exists)} nuclei')
+                    print(f'skipped {len(nu_id_exists)}/{len(nu_id_li)} nuclei')
+                    print(f'left {len(nu_id_li) - len(nu_id_exists)} nuclei')
                 nu_geojson = [elem for elem in nu_geojson if elem['properties']['nuclei_id'] not in nu_id_exists]
         else:
             table_created = False
