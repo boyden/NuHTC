@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <a href="https://www.sciencedirect.com/science/article/pii/S1361841525001422">Paper</a> |
   <a href="#-setup-environment">Setup</a> |
   <a href="#-train">Train</a> |
   <a href="#-test">Test</a> |
