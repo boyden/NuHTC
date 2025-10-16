@@ -43,6 +43,7 @@ feat_data
 feat_data/
 figures
 cp.py
+*.ipynb
 
 # Pytorch
 *.pth
