@@ -11,6 +11,7 @@ __pycache__/
 */__pycache__
 *.egg-info
 build
+**/.ipynb_checkpoints/
 #lib
 tests
 thirdparty
@@ -20,6 +21,7 @@ thirdparty/
 wandb
 data
 data/
+demo
 /datasets
 results
 results/

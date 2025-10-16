@@ -1,9 +1,24 @@
+'''
+Example:
+    >>> from mmdet.models import ResNet
+    >>> import torch
+    >>> self = ResNet(depth=18)
+    >>> self.eval()
+    >>> inputs = torch.rand(1, 3, 32, 32)
+    >>> level_outputs = self.forward(inputs)
+    >>> for level_out in level_outputs:
+    ...     print(tuple(level_out.shape))
+    (1, 64, 8, 8)
+    (1, 128, 4, 4)
+    (1, 256, 2, 2)
+    (1, 512, 1, 1)
+'''
 # CUDA_VISIBLE_DEVICES=1 nohup python tools/train.py configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py > WSI_Seg_PanNuke_HTC_lite_swin_fold1.log 2>&1 &
 # ps aux | grep WSI_Seg_HTC_swin_PanNuke.py | awk '{print $2}' | xargs kill -9
 fold = 1
 thres = 0.965926
 num_classes = 5
-scale_factor = 2.0 # 2.0 corresponds to 40x. 4.0 corresponds to 20x (09/17/2025)
+scale_factor = 4.0 # 2.0 corresponds to 40x. 4.0 corresponds to 20x
 max_epochs = 200
 img_norm_cfg = dict(mean=[123.675, 116.28, 103.53],  std=[58.395, 57.12, 57.375], to_rgb=True)
 dist_params = dict(backend='nccl')
@@ -18,8 +33,8 @@ log_note = f'{neck_type}_AttenROI_thres_{int(thres*100)}_base_aug_cas'
 log_name = f'htc_lite_swin_pytorch_seasaw_{log_note}_{dataset_name}_full_epoch_{max_epochs}_fold{fold}'
 work_dir = f'./work_dirs/{log_name}'
 # PATH that need to be replaced
-data_dir = './datasets'
-basedir = f'{data_dir}/{dataset_name}'
+data_dir = '/home/bao/dataset'
+basedir = f'{data_dir}/NuSeg/{dataset_name}'
 pretrained = 'https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_tiny_patch4_window7_224.pth'
 load_from = None
 resume_from = None
@@ -75,7 +90,7 @@ model=dict(
         mask_info_flow=True,
         num_stages=3,
         stage_loss_weights=[1, 0.5, 0.25],
-        watershed_proposal=True,
+        watershed_proposal=False,
         bbox_roi_extractor=dict(
             type='AttentionRoIExtractor',
             start_level=2,
@@ -333,7 +348,7 @@ test_pipeline = [
             dict(type='RandomFlip'),
             dict(type='Normalize', **img_norm_cfg),
             dict(type='Pad', size_divisor=32),
-            dict(type='ImageToTensor', keys=['img']),
+            dict(type='DefaultFormatBundle'),
             dict(type='Collect', keys=['img']),
         ])
 ]
@@ -345,15 +360,22 @@ data = dict(
         type='CASDataset',
         dataset=dict(
             type='PanNukeCocoDataset',
-            ann_file=f'./coco/PanNuke/PanNuke_annt_RLE_fold{(fold-1)%3+1}.json',
+            ann_file=f'{basedir}/PanNuke_annt_RLE_fold{(fold-1)%3+1}{(fold)%3+1}.json',
             img_prefix=f'{basedir}/rgb/',
             seg_prefix=f'{basedir}/rgb_seg',
             pipeline=train_pipeline,
         )
     ),
+    val=dict(
+        type='PanNukeCocoDataset',
+        ann_file=f'{basedir}/PanNuke_annt_RLE_fold{(fold+4)%3+1}.json',
+        img_prefix=f'{basedir}/rgb/',
+        seg_prefix=f'{basedir}/rgb_seg',
+        pipeline=test_pipeline,
+    ),
     test=dict(
         type='PanNukeCocoDataset',
-        ann_file=f'./coco/PanNuke/PanNuke_annt_RLE_fold{(fold+4)%3+1}.json',
+        ann_file=f'{basedir}/PanNuke_annt_RLE_fold{(fold+4)%3+1}.json',
         img_prefix=f'{basedir}/rgb/',
         seg_prefix=f'{basedir}/rgb_seg',
         pipeline=test_pipeline,
@@ -396,7 +418,7 @@ custom_hooks = [
     dict(type='NumClassCheckHook'),
     dict(type='WeightSummary'),
     dict(type='Mask_Vis_Hook', interval=2000),
-    dict(type='LinearMomentumEMAHook', momentum=0.0002, warm_up=100, priority=40),
+    dict(type='LinearMomentumEMAHook', momentum=0.0002, warm_up=100),
     dict(type='FineTune', iter=15000),
 ]
 

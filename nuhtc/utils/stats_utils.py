@@ -30,6 +30,7 @@ def mask_nms(masks, pred_scores, thr=0.9):
             if tmp_iou > thr:
                 keep_idx[j] = 0
     return tmp_masks[keep_idx==1].tolist(), keep_idx
+    
 # --------------------------Optimised for Speed
 def get_fast_aji(true_masks, pred_masks, pairwise_inter=None, pairwise_union=None):
     """AJI version distributed by MoNuSeg, has no permutation problem but suffered from
@@ -148,7 +149,7 @@ def get_fast_pq(true_masks, pred_masks, pairwise_inter=None, pairwise_union=None
                       pairing information to perform measurement
                     
     """
-    assert match_iou >= 0.0, "Cant' be negative"
+    assert match_iou >= 0.0, "Can't be negative"
     if pairwise_inter is None or pairwise_union is None:
         pairwise_inter, pairwise_union = get_pairwise_iou(true_masks, pred_masks)
     pairwise_iou = pairwise_inter / (pairwise_union + 1.0e-6)

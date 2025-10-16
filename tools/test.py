@@ -4,7 +4,7 @@ import os.path as osp
 import time
 import warnings
 import sys
-sys.path.insert(0, 'thirdparty/mmdetection')
+sys.path.insert(0, '/home/sul084/immune-decoder/segmentation/NuHTC/thirdparty/mmdetection')
 sys.path.insert(0, '.')
 import mmcv
 import torch
@@ -16,6 +16,7 @@ from mmdet.apis import multi_gpu_test, single_gpu_test
 from mmdet.datasets import build_dataloader, build_dataset, replace_ImageToTensor
 from mmdet.models import build_detector
 
+sys.path.insert(0, '/home/sul084/immune-decoder/segmentation/NuHTC')
 from nuhtc.utils import patch_config
 from nuhtc.apis import single_gpu_test_score
 from nuhtc.datasets import build_dataloader

@@ -7,6 +7,11 @@ import scipy.io as sio
 import random
 import colorsys
 import cv2
+import sys
+
+proj_path = '/home/sul084/immune-decoder/segmentation/NuHTC'
+sys.path.insert(0, f'{proj_path}/thirdparty/mmdetection')
+sys.path.insert(0, proj_path)
 
 from collections import OrderedDict
 from PIL import Image

@@ -1,4 +1,4 @@
-"""compute_stats.py. Calculates the statistical measurements for the CoNIC Challenge.
+"""compute_stats.py. Calculates the statistical measurements for the CoNIC Challenge --> for .npy format!!
 
 This code supports binary panoptic quality for binary segmentation, multiclass panoptic quality for 
 simultaneous segmentation and classification and multiclass coefficient of determination (R2) for
