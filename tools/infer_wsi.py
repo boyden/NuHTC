@@ -451,6 +451,9 @@ def main():
         os.makedirs(f"{args.save_dir}/nuclei/{slide_id}", exist_ok=True)
         print('\nprogress: {}/{}'.format(bag_candidate_idx, total))
         print(slide_id)
+        if os.path.exists(f'{args.save_dir}/nuclei/{slide_id}/{slide_id}_merged.geojson'):
+            print(f'skip {slide_id} due to existing results')
+            continue
 
         wsi = openslide.open_slide(slide_file_path)
         wsi_shape = wsi.level_dimensions[0]
