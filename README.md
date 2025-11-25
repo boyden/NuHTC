@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <a href="https://www.sciencedirect.com/science/article/pii/S1361841525001422">Paper</a> |
   <a href="#-setup-environment">Setup</a> |
   <a href="#-train">Train</a> |
   <a href="#-test">Test</a> |
@@ -29,6 +30,8 @@ Setup the Python environment
 conda create -n nuhtc -y python=3.10 
 conda activate nuhtc
 conda install pytorch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 pytorch-cuda=11.6 -c pytorch -c nvidia
+# or
+# pip install torch==1.13.1+cu116 torchvision==0.14.1+cu116 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu116
 pip install -r requirements.txt
 pip install mmcv-full==1.7.2 -f https://download.openmmlab.com/mmcv/dist/cu116/torch1.13/index.html
 python -m pip install histomicstk==1.2.10 --find-links https://girder.github.io/large_image_wheels -i https://pypi.org/simple
@@ -154,7 +157,7 @@ python tools/nuclei_merge.py \
 --overlap_threshold 0.05 --merge_strategy probability
 ```
 
-We provide a WSI example from TCGA (filename: `TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724.svs`), which includes the `geojson` file for both nuclei points and contours. These can be easily dragged into, viewed, and edited using [QuPath](https://qupath.github.io/). The WSI example can be downloaded from [Google Drive](https://drive.google.com/drive/folders/1UdCixl10kBxyKHUGOww4WIkdoFma-UIr?usp=drive_link).
+We provide a WSI example from TCGA (filename: `TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724.svs`), which includes the `geojson` file for both nuclei points and contours. These can be easily dragged into, viewed, and edited using [QuPath](https://qupath.github.io/) (checked in QuPath Version 0.5.1). The WSI example can be downloaded from [Google Drive](https://drive.google.com/drive/folders/1UdCixl10kBxyKHUGOww4WIkdoFma-UIr?usp=drive_link).
 
 The `dsa` is a format supported by [Digital Slide Archive](https://digitalslidearchive.github.io/digital_slide_archive/), a powerful containerized web-based platform for storing, managing, viewing, and analysing WSIs. If you are interested in using the DSA platform, please refer to its [deployment instructions](https://github.com/DigitalSlideArchive/digital_slide_archive/blob/master/devops/dsa/README.rst).
 
