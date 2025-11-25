@@ -27,14 +27,7 @@ def single_gpu_feat(model,
                     **kwargs):
 
     model.eval()
-    if name is None:
-        feat_32_name = 'feat_32'
-        feat_16_name = 'feat_16'
-    else:
-        feat_32_name = f'feat_32_{name}'
-        feat_16_name = f'feat_16_{name}'
-    os.makedirs(f'{out_dir}/{feat_32_name}', exist_ok=True)
-    os.makedirs(f'{out_dir}/{feat_16_name}', exist_ok=True)
+    os.makedirs(f'{out_dir}', exist_ok=True)
     dataset = data_loader.dataset
     prog_bar = mmcv.ProgressBar(len(dataset))
     for i, data in enumerate(data_loader):
@@ -43,11 +36,12 @@ def single_gpu_feat(model,
         with torch.no_grad():
             feat_map = model.module.extract_feat(data['img'][0].to(model.device_ids[0]))
         batch_size = len(data['img'])
-        img_feat_32 = feat_map[2][0].cpu().numpy().transpose((1, 2, 0))
-        img_feat_16 = feat_map[3][0].cpu().numpy().transpose((1, 2, 0))
-        np.save(f'{out_dir}/{feat_32_name}/{img_name}.npy', img_feat_32)
-        np.save(f'{out_dir}/{feat_16_name}/{img_name}.npy', img_feat_16)
-
+        img_feat_lvls = [] 
+        for lvl in range(len(feat_map)):
+            img_feat = feat_map[lvl][0].cpu().numpy().mean(axis=(1, 2))
+            img_feat_lvls.append(img_feat)
+        img_feat_lvls = np.concatenate(img_feat_lvls, axis=0)
+        np.save(f'{out_dir}/{img_name}.npy', img_feat_lvls)
         for _ in range(batch_size):
             prog_bar.update()
     return True
