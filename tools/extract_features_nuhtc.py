@@ -202,8 +202,8 @@ def parse_args():
 
 # Example command:
 # CUDA_VISIBLE_DEVICES=1 python extract_features_nuhtc.py \
-#     --config /home/bao/code/NuHTC/models/htc_lite_PanNuke_generic_infer_20.py \
-#     --checkpoint /home/bao/code/NuHTC/models/ema_pannuke_generic.pth \
+#     --config /home/bao/code/NuHTC/models/htc_lite_PanNuke_infer_20.py \
+#     --checkpoint /home/bao/code/NuHTC/models/ema_pannuke.pth \
 #     --data_h5_dir /data/data1/WSI/TCGA_BRCA/TCGA_BRCA_FEAT \
 #     --data_slide_dir /data/data1/WSI/TCGA_BRCA/WSI \
 #     --slide_ext .svs \
