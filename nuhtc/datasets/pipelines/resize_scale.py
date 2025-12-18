@@ -117,6 +117,53 @@ class Resize_Scale(Resize):
 
 
 @PIPELINES.register_module()
+class SmartResize(Resize):
+    """Smartly resize images based on bins (128, 256, 512) and then apply scale_factor.
+    
+    Args:
+        scale_factor (float): Factor to multiply the binned size by.
+        kwargs: Other arguments for the base Resize class.
+    """
+    def __init__(self, scale_factor=2.0, **kwargs):
+        self.factor = scale_factor
+        # We don't pass img_scale to parent, we will set results['scale'] dynamically
+        if 'img_scale' in kwargs:
+            kwargs.pop('img_scale')
+        super().__init__(img_scale=None, **kwargs)
+
+    def __call__(self, results):
+        h, w = results['img'].shape[:2]
+        
+        # Binning logic
+        if h > 512 or w > 512:
+            raise ValueError(f"image too large: {h}x{w}. Maximum supported size is 512x512.")
+
+        def get_target(val):
+            if val <= 192: # (128 + 256) / 2
+                return 128
+            elif val <= 384: # (256 + 512) / 2
+                return 256
+            else:
+                return 512
+
+        target_h = get_target(h)
+        target_w = get_target(w)
+            
+        # Set the dynamic scale for the parent Resize class to use
+        # results['scale'] is expected to be (w, h)
+        results['scale'] = (int(target_w * self.factor), int(target_h * self.factor))
+        
+        # Remove scale_factor if it exists to avoid AssertionError in Resize.__call__
+        if 'scale_factor' in results:
+            results.pop('scale_factor')
+        
+        return super().__call__(results)
+
+    def __repr__(self):
+        return self.__class__.__name__ + f'(scale_factor={self.factor})'
+
+
+@PIPELINES.register_module()
 class CusRandomCrop(RandomCrop):
     """Random crop the image & bboxes & masks.
 
