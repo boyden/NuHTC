@@ -257,8 +257,10 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
             fg_mask_path = f'{save_dir}/foregrounds/{slide_id}.png'
             if os.path.exists(fg_mask_path):
                 print('mask for {} already exists, skipping segmentation'.format(slide_id))
-                img_otsu = Image.open(fg_mask_path)
-                img_otsu = (np.array(img_otsu) > 0).astype(np.uint8)
+                img_otsu = np.array(Image.open(fg_mask_path))
+                if img_otsu.ndim == 3:
+                    img_otsu = img_otsu.max(axis=-1)
+                img_otsu = (img_otsu > 0).astype(np.uint8)
             else:
                 img_otsu = None
             current_seg_params.update({'img_otsu': img_otsu})
