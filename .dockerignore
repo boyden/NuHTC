@@ -1,0 +1,49 @@
+# Training outputs and large data — excluded to keep build context small
+work_dirs/
+datasets/
+coco/
+models/
+
+# WSI/inference output directories under demo/
+demo/wsi/
+demo/imgs_infer/
+demo/wsi_infer/
+demo/wsi_res/
+
+# Python bytecode
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+
+# Binary model/data artifacts — too large for the image
+**/*.pth
+**/*.ckpt
+**/*.npy
+**/*.h5
+**/*.svs
+**/*.ndpi
+**/*.tiff
+**/*.tif
+
+# VCS and editor state
+.git
+.github
+.gitignore
+.gitattributes
+.idea
+.vscode
+.cursor
+.claude
+CLAUDE.md
+
+# Logs and experiment tracking
+*.log
+wandb/
+
+# Build/test caches
+*.egg-info
+# thirdparty/mmdetection vendored source is KEPT, but exclude its build artefacts
+thirdparty/mmdetection/mmdet.egg-info
+.pytest_cache
+.mypy_cache

@@ -1,0 +1,40 @@
+services:
+  nuhtc:
+    image: nuhtc:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    # GPU access via nvidia-container-toolkit (compose >= 1.28).
+    # Using shm_size instead of ipc: host to avoid sharing the host IPC
+    # namespace — shm_size gives DataLoader workers enough shared memory
+    # while keeping the container isolated. Switch to ipc: host only if
+    # you need >16 GB of shared memory or encounter NCCL multi-GPU issues.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    shm_size: '16gb'
+
+    working_dir: /workspace
+    tty: true
+    stdin_open: true
+
+    environment:
+      - WANDB_MODE=offline
+      - CUDA_VISIBLE_DEVICES=0
+
+    volumes:
+      - ./datasets:/workspace/datasets
+      - ./coco:/workspace/coco
+      - ./models:/workspace/models
+      - ./work_dirs:/workspace/work_dirs
+      # The image ships sample PNGs at /workspace/demo/imgs inside the container.
+      # Mounting host ./demo here SHADOWS those samples. If you want to keep
+      # using the baked-in samples, either comment out this line, or copy them
+      # to your host ./demo/imgs/ first (see DOCKER.md "Demo-data shadowing").
+      - ./demo:/workspace/demo

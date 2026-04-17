@@ -7,11 +7,13 @@
 <p align="center">
   <a href="https://www.sciencedirect.com/science/article/pii/S1361841525001422">Paper</a> |
   <a href="#-setup-environment">Setup</a> |
+  <a href="#-docker">Docker</a> |
   <a href="#-train">Train</a> |
   <a href="#-test">Test</a> |
   <a href="#-infer">Infer</a> |
   <a href="#-segment-the-whole-slide-image">WSI Segmentation</a> |
   <a href="#-extract-the-nuclei-feature">Feature Extraction</a> |
+  <a href="#-using-nuhtc-on-your-own-images">Use on your own images</a> |
   <a href="#-citation">Citation</a>
 </p>
 
@@ -36,6 +38,38 @@ pip install -r requirements.txt
 pip install mmcv-full==1.7.2 -f https://download.openmmlab.com/mmcv/dist/cu116/torch1.13/index.html
 python -m pip install histomicstk==1.2.10 --find-links https://girder.github.io/large_image_wheels -i https://pypi.org/simple
 ```
+
+## 🐳 Docker
+
+A self-contained Docker image is provided so you can skip the Python/CUDA install dance. Full build, run, and troubleshooting notes live in [`DOCKER.md`](./DOCKER.md); this section is the 60-second version.
+
+**Build:**
+```shell
+docker build -t nuhtc:latest .
+```
+The first build pulls ~6 GB of PyTorch 1.13.1 + CUDA 11.6 base image and runs heavy pip installs (mmcv-full, histomicstk); budget 20–30 minutes.
+
+**Distribute a prebuilt image** (so a collaborator does not have to rebuild):
+```shell
+docker save nuhtc:latest | gzip > nuhtc-latest.tar.gz
+# On the receiving host:
+gunzip -c nuhtc-latest.tar.gz | docker load
+```
+
+**Run an interactive shell:**
+```shell
+docker compose run --rm nuhtc
+# or, with plain docker run:
+docker run --gpus all --rm -it --shm-size=16g -v $(pwd)/models:/workspace/models nuhtc:latest
+```
+
+**Host requirements:** Docker 20.10+, `nvidia-container-toolkit`, NVIDIA driver ≥ 510 (for CUDA 11.6 runtime). See `DOCKER.md` for install and troubleshooting.
+
+The image ships everything the Python install section above installs, with a few deliberate changes documented in `DOCKER.md`:
+- `h5py==3.11.0` pinned (wheel-only, avoids source build against old libhdf5).
+- `histomicstk` installed via `--no-deps` with pure-Python runtime deps listed manually (side-steps `openslide-bin` / `GDAL` source-build failures; code paths NuHTC uses are verified).
+- `scikit-image>=0.22,<0.25` (the pinned 0.18.3 is incompatible with numpy 1.26).
+- `mmtrack`, `ts`, `model_archiver`, `pytorch_sphinx_theme` filtered out at install time (never imported by this repo).
 
 ## 👉 Preprocessing data
 First please download and unzip the files from [PanNuke dataset](https://warwick.ac.uk/fac/cross_fac/tia/data/pannuke), where the folder structure should look like this:
@@ -204,6 +238,45 @@ It will extract the nuclei feature for each image and then store them in a csv f
 | 214 | 4     | 328             | 448             | 360             | 486             | 342.695              | 466.659              | 342.382                      | 466.577                      | -0.532                  | 904.000   | 954.000             | 40.653               | 28.492               | 124.870        | 0.729             | 0.713              | 33.927                   | 0.743        | 1.074                  | 0.701                     | 0.948          | 0.170            | 0.003            | 0.000            | 0.000            | 0.000            | 0.000            | 0.000            | 0.001                    | 0.000                    | 0.000                    | 0.000                    | -0.000                   | -0.000                   | 0.000                    | 0.420      | 0.000      | 0.002      | 0.006      | 0.138      | 0.202      | 101.000               | 245.000               | 185.750                | 184.000                  | 1.750                            | 25.644                | 30.000                | 15.000                | -0.014                     | -0.012                     | 0.165                        | 1.969                         | 9.395                     | 5.312                    | 0.851                         | 0.642                         | 2.006                            | 0.154                           | 150.000                    | 0.166                       | 0.017                     | 0.006                      | 1.786                          | 1.359                           | 0.963                             | 0.030                              | 24.275                             | 1.308                               | 0.597                     | 0.142                      | 40.420                           | 0.426                             | 95.315                            | 6.510                              | 5.173                            | 0.044                             | 6.450                         | 0.509                          | 0.010                                    | 0.003                                     | 1.754                                   | 0.396                                    | -0.464                     | 0.125                       | 0.989                      | 0.012                       | E         | 28     | C        | 32       | 28.png    |
 | 215 | 5     | 266             | 404             | 316             | 454             | 290.478              | 427.398              | 290.924                      | 427.688                      | -0.785                  | 1808.000  | 1892.000            | 60.816               | 38.141               | 180.770        | 0.695             | 0.779              | 47.979                   | 0.723        | 0.826                  | 0.627                     | 0.956          | 0.178            | 0.006            | 0.000            | 0.000            | 0.000            | 0.000            | -0.000           | 0.001                    | 0.000                    | 0.000                    | 0.000                    | 0.000                    | 0.000                    | -0.000                   | 0.508      | 0.005      | 0.009      | 0.012      | 0.009      | 0.212      | 70.000                | 255.000               | 196.299                | 201.000                  | -4.701                           | 30.024                | 36.000                | 18.000                | -0.886                     | 1.016                      | 0.189                        | 1.841                         | 12.020                    | 10.098                   | 2.042                         | 4.591                         | 1.457                            | 0.298                           | 346.000                    | 0.191                       | 0.012                     | 0.004                      | 4.300                          | 4.445                           | 0.952                             | 0.051                              | 44.963                             | 1.119                               | 0.530                     | 0.129                      | 41.760                           | 0.324                             | 175.550                           | 8.610                              | 5.444                            | 0.032                             | 7.176                         | 0.562                          | 0.008                                    | 0.003                                     | 2.204                                   | 0.547                                    | -0.393                     | 0.131                       | 0.984                      | 0.020                       | E         | 28     | C        | 32       | 28.png    |
 
+
+## 🧪 Using NuHTC on your own images
+
+The provided checkpoints (PanNuke / CoNSeP / NuCLS / CoNIC) are trained on H&E-stained tumor histopathology at 40× magnification. You can point the inference scripts at your own data by mounting a host directory into the container.
+
+### Patch-level inference (your own PNGs)
+
+```shell
+docker run --gpus all --rm --shm-size=16g \
+  -v /path/to/your/pngs:/data/in \
+  -v /path/to/output:/data/out \
+  -v $(pwd)/models:/workspace/models \
+  nuhtc:latest -c "python tools/infer.py /data/in \
+    configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py \
+    models/pannuke.pth --output /data/out"
+```
+
+### WSI inference (your own slides)
+
+```shell
+docker run --gpus all --rm --shm-size=16g \
+  -v /path/to/your/wsi:/data/wsi \
+  -v /path/to/output:/data/out \
+  -v $(pwd)/models:/workspace/models \
+  nuhtc:latest -c "python tools/infer_wsi.py /data/wsi \
+    configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py \
+    models/pannuke.pth --patch --seg --stitch \
+    --patch_size 512 --step_size 448 --batch_size 32 \
+    --save_dir /data/out --mode qupath"
+```
+
+### Things to watch out for
+
+1. **File extension.** `tools/infer.py` only globs `*.png`. Convert JPEG/TIFF first, or edit the glob pattern in the script.
+2. **Class labels are dataset-specific.** `pannuke.pth` outputs PanNuke classes `T / I / C / D / E` (Neoplastic, Inflammatory, Connective, Dead, Epithelial) — only meaningful on H&E-stained tumor tissue. IHC, fluorescence, or non-tumor tissue will produce poor classifications (segmentation is usually still workable). For other domains, download the CoNSeP / NuCLS / CoNIC checkpoints and their matching config from the [Google Drive](https://drive.google.com/drive/folders/1MezZrVwx7S6MNYkpMO5ja2D6KcZkRvYo?usp=sharing).
+3. **Magnification.** Training is at 40×. If your WSI is at 20× or 10×, either rescale before inference or expect output coordinates in the wrong units.
+4. **WSI output formats.** `--mode qupath` emits a GeoJSON that drops directly into QuPath. `coco` is patch-level only (for feature extraction). `sql` and `dsa` target their respective databases.
+5. **`--shm-size=16g`.** PyTorch DataLoader workers segfault without this on the pytorch base image — keep it on `docker run`, it is already set in `docker-compose.yml`.
+6. **Demo data shadowing (compose only).** `docker-compose.yml` mounts `./demo` over `/workspace/demo`, which hides the sample images baked into the image. See the `docker-compose.yml` inline comment and the Troubleshooting section of `DOCKER.md` for how to recover the baked samples.
 
 ## 🗓️ Ongoing
 - [x] Merge overlapping nuclei when segmenting the WSI
