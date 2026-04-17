@@ -1,6 +1,22 @@
 # Docker Usage Guide — NuHTC
 
-This guide covers building the NuHTC Docker image and running training, inference, testing, WSI segmentation, and feature extraction inside a container.
+This guide covers pulling / building the NuHTC Docker image and running training, inference, testing, WSI segmentation, and feature extraction inside a container.
+
+---
+
+## Quick start — pull the prebuilt image
+
+The fastest path: pull the image we publish to GHCR. It ships with `pannuke.pth` already baked in at `/workspace/models/pannuke.pth`, so inference runs with no weight download and no Python setup.
+
+```shell
+docker pull ghcr.io/kaneyxx/nuhtc:latest
+```
+
+Everywhere below you can substitute `nuhtc:latest` (local build) with `ghcr.io/kaneyxx/nuhtc:latest` (prebuilt). Commands in this guide use the short `nuhtc:latest` tag for brevity; re-tag locally if you prefer:
+
+```shell
+docker tag ghcr.io/kaneyxx/nuhtc:latest nuhtc:latest
+```
 
 ---
 
@@ -24,13 +40,15 @@ This guide covers building the NuHTC Docker image and running training, inferenc
 
 ---
 
-## Building the Image
+## Building the Image (optional — only if you prefer to build locally)
 
-Run this once from the repository root:
+If you want to modify the image or build without the GHCR dependency, run from the repository root:
 
 ```shell
 docker build -t nuhtc:latest .
 ```
+
+If `./models/pannuke.pth` (or another checkpoint) exists in the build context, it is baked into the image at `/workspace/models/`; otherwise the image builds weight-less and you mount weights at run time.
 
 The image sets `WORKDIR /workspace` and uses `/bin/bash` as its entrypoint. First build pulls ~6 GB of base image and runs heavy pip installs (`mmcv-full`, `histomicstk`); budget 20–30 minutes depending on network.
 
@@ -40,14 +58,17 @@ The image sets `WORKDIR /workspace` and uses `/bin/bash` as its entrypoint. Firs
 
 ### Quick one-off shell
 
+The baked PanNuke weight is already at `/workspace/models/pannuke.pth`, so the `./models` mount below is only needed if you want to override with a different checkpoint or use CoNSeP / NuCLS / CoNIC weights. Same for `./demo` (baked sample images).
+
 ```shell
 docker run --rm -it --gpus all \
   --shm-size=16gb \
   -v ./datasets:/workspace/datasets \
   -v ./coco:/workspace/coco \
-  -v ./models:/workspace/models \
   -v ./work_dirs:/workspace/work_dirs \
-  -v ./demo:/workspace/demo \
+  # Optional overrides (remove the `#` to enable):
+  # -v ./models:/workspace/models    # override baked pannuke.pth
+  # -v ./demo:/workspace/demo        # override baked demo/imgs
   nuhtc:latest
 ```
 
@@ -71,27 +92,26 @@ docker compose run --rm nuhtc python tools/train.py configs/nuhtc/htc_lite_swin_
 
 The compose service and the example `docker run` command above both mount:
 
-| Host path | Container path | Contents |
-|---|---|---|
-| `./datasets` | `/workspace/datasets` | PanNuke raw numpy files |
-| `./coco` | `/workspace/coco` | COCO-format annotation JSONs |
-| `./models` | `/workspace/models` | Pre-trained checkpoints |
-| `./work_dirs` | `/workspace/work_dirs` | Training outputs and logs |
-| `./demo` | `/workspace/demo` | Demo images and WSI files |
+| Host path | Container path | Contents | When to mount |
+|---|---|---|---|
+| `./datasets` | `/workspace/datasets` | PanNuke raw numpy files | Training / testing |
+| `./coco` | `/workspace/coco` | COCO-format annotation JSONs | Training / testing |
+| `./work_dirs` | `/workspace/work_dirs` | Training outputs and logs | Training |
+| `./models` | `/workspace/models` | Pre-trained checkpoints | **Optional** — shadows the baked `pannuke.pth`; mount only to swap in a different weight |
+| `./demo` | `/workspace/demo` | Demo images and WSI files | **Optional** — shadows the baked `demo/imgs` samples; mount only to use your own inputs |
 
-Create the host directories before the first run:
+Create the host directories before the first training / testing run:
 
 ```shell
-mkdir -p datasets coco models work_dirs demo/imgs
+mkdir -p datasets coco work_dirs
 ```
 
-> **Demo-data shadowing:** the compose mount `./demo:/workspace/demo` replaces the baked-in sample images from the repo. If you want to use the bundled samples, copy them out of the image first:
+> **Override vs baked content.** The image bundles `pannuke.pth` at `/workspace/models/pannuke.pth` and a small set of demo PNGs at `/workspace/demo/imgs/`. Mounting `./models` or `./demo` REPLACES the entire directory view — you lose the baked content while the mount is active. That is usually what you want (you are bringing your own data), but if you want both the baked demo samples AND your own data, copy the baked samples out first:
 > ```shell
 > docker create --name nuhtc-tmp nuhtc:latest && \
 >   docker cp nuhtc-tmp:/workspace/demo/imgs ./demo/ && \
 >   docker rm nuhtc-tmp
 > ```
-> Or drop the `./demo` volume from `docker-compose.yml` to use the baked-in samples directly.
 
 ---
 
@@ -157,7 +177,7 @@ docker compose run --rm nuhtc \
 
 ## Inference
 
-Download the checkpoint from the `models/` folder of the [project Google Drive](https://drive.google.com/drive/folders/1MezZrVwx7S6MNYkpMO5ja2D6KcZkRvYo?usp=sharing) (file: `pannuke.pth`) into `./models/pannuke.pth` on the host. Then:
+The PanNuke checkpoint is already baked into the image at `/workspace/models/pannuke.pth`, so nothing to download or mount:
 
 ```shell
 docker compose run --rm nuhtc \
@@ -166,6 +186,16 @@ docker compose run --rm nuhtc \
     configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py \
     models/pannuke.pth \
     --output demo/imgs_infer"
+```
+
+To use a different checkpoint (CoNSeP / NuCLS / CoNIC), download it from the [Google Drive](https://drive.google.com/drive/folders/1MezZrVwx7S6MNYkpMO5ja2D6KcZkRvYo?usp=sharing) and mount its host directory over `/workspace/models`:
+
+```shell
+docker run --gpus all --rm --shm-size=16g \
+  -v /path/to/your/weights:/workspace/models \
+  nuhtc:latest -c "python tools/infer.py demo/imgs \
+    configs/nuhtc/htc_lite_swin_pytorch_fpn_CoNSeP_seasaw_CAS.py \
+    models/consep.pth --output /tmp/out"
 ```
 
 ---
@@ -185,7 +215,7 @@ docker compose run --rm nuhtc \
     --batch_size 32 --save_dir demo/wsi_infer --mode qupath"
 ```
 
-For 512×512 patches (stronger overlap performance):
+For 512×512 patches (stronger edge performance, but heavier on VRAM — **`--batch_size 32` OOMs on a 24 GB GPU, drop to `--batch_size 8` first**):
 
 ```shell
 docker compose run --rm nuhtc \
@@ -195,7 +225,7 @@ docker compose run --rm nuhtc \
     models/pannuke.pth \
     --patch --seg --stitch \
     --patch_size 512 --step_size 448 --margin 1 --min_area 10 \
-    --batch_size 32 --save_dir demo/wsi_infer --mode qupath"
+    --batch_size 8 --save_dir demo/wsi_infer --mode qupath"
 ```
 
 ### 2. Merge overlapping nuclei

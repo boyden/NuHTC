@@ -2,7 +2,11 @@
 work_dirs/
 datasets/
 coco/
-models/
+# Exclude everything under models/ by default, but keep pannuke.pth so it can
+# be baked into the image for a zero-download "just docker run" experience.
+# To bake other weights, add another `!models/<name>.pth` line here.
+models/*
+!models/pannuke.pth
 
 # WSI/inference output directories under demo/
 demo/wsi/
@@ -18,6 +22,7 @@ demo/wsi_res/
 
 # Binary model/data artifacts — too large for the image
 **/*.pth
+!models/pannuke.pth
 **/*.ckpt
 **/*.npy
 **/*.h5
@@ -47,3 +52,10 @@ wandb/
 thirdparty/mmdetection/mmdet.egg-info
 .pytest_cache
 .mypy_cache
+
+# Docker image tarballs (previously-saved images in the repo root)
+*.tar.gz
+*.tar
+
+# OMC scratch (PRD, progress logs, build watchdog script)
+.omc/

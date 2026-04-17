@@ -31,10 +31,14 @@ services:
     volumes:
       - ./datasets:/workspace/datasets
       - ./coco:/workspace/coco
-      - ./models:/workspace/models
       - ./work_dirs:/workspace/work_dirs
-      # The image ships sample PNGs at /workspace/demo/imgs inside the container.
-      # Mounting host ./demo here SHADOWS those samples. If you want to keep
-      # using the baked-in samples, either comment out this line, or copy them
-      # to your host ./demo/imgs/ first (see DOCKER.md "Demo-data shadowing").
-      - ./demo:/workspace/demo
+      # The image bakes:
+      #   /workspace/models/pannuke.pth    (PanNuke checkpoint)
+      #   /workspace/demo/imgs/*.png       (sample images for tools/infer.py)
+      # The two mounts below would OVERRIDE those baked directories. Uncomment
+      # only if you want to swap in your own weights or feed your own demo
+      # data. If enabled, create the host dirs first (`mkdir -p models demo`)
+      # or compose will create them as root-owned empty dirs and you'll see
+      # "pannuke.pth: no such file" / empty glob results.
+      # - ./models:/workspace/models
+      # - ./demo:/workspace/demo

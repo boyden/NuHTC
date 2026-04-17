@@ -41,35 +41,52 @@ python -m pip install histomicstk==1.2.10 --find-links https://girder.github.io/
 
 ## 🐳 Docker
 
-A self-contained Docker image is provided so you can skip the Python/CUDA install dance. Full build, run, and troubleshooting notes live in [`DOCKER.md`](./DOCKER.md); this section is the 60-second version.
+A prebuilt Docker image with `pannuke.pth` **already baked in** is published on GitHub Container Registry. You can go from zero to running inference in one `docker pull` — no Python environment, no weight download. Full notes live in [`DOCKER.md`](./DOCKER.md); this section is the quick start.
 
-**Build:**
+### Pull & run
+
 ```shell
+docker pull ghcr.io/kaneyxx/nuhtc:latest
+```
+
+Run patch-level inference on your own PNGs — weights are already inside, nothing to mount for the model:
+```shell
+docker run --gpus all --rm --shm-size=16g \
+  -v /path/to/your/pngs:/data/in \
+  -v /path/to/output:/data/out \
+  ghcr.io/kaneyxx/nuhtc:latest -c "python tools/infer.py /data/in \
+    configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py \
+    models/pannuke.pth --output /data/out"
+```
+
+See [Using NuHTC on your own images](#-using-nuhtc-on-your-own-images) for WSI inference and the practical caveats (file extensions, class labels, magnification, shared memory).
+
+### Build from source (optional)
+
+Only needed if you want to modify the image:
+
+```shell
+git clone https://github.com/kaneyxx/NuHTC.git
+cd NuHTC
+# Drop your pannuke.pth (or other checkpoint) into ./models/ to bake it in;
+# otherwise the image builds without weights and you mount them at run time.
 docker build -t nuhtc:latest .
 ```
-The first build pulls ~6 GB of PyTorch 1.13.1 + CUDA 11.6 base image and runs heavy pip installs (mmcv-full, histomicstk); budget 20–30 minutes.
+First build pulls ~6 GB of base image and runs heavy pip installs; budget 20–30 minutes.
 
-**Distribute a prebuilt image** (so a collaborator does not have to rebuild):
-```shell
-docker save nuhtc:latest | gzip > nuhtc-latest.tar.gz
-# On the receiving host:
-gunzip -c nuhtc-latest.tar.gz | docker load
-```
+### Host requirements
 
-**Run an interactive shell:**
-```shell
-docker compose run --rm nuhtc
-# or, with plain docker run:
-docker run --gpus all --rm -it --shm-size=16g -v $(pwd)/models:/workspace/models nuhtc:latest
-```
+Docker 20.10+, [`nvidia-container-toolkit`](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html), NVIDIA driver ≥ 510 (for CUDA 11.6 runtime). See `DOCKER.md` for install and troubleshooting.
 
-**Host requirements:** Docker 20.10+, `nvidia-container-toolkit`, NVIDIA driver ≥ 510 (for CUDA 11.6 runtime). See `DOCKER.md` for install and troubleshooting.
+### What the image contains
 
-The image ships everything the Python install section above installs, with a few deliberate changes documented in `DOCKER.md`:
-- `h5py==3.11.0` pinned (wheel-only, avoids source build against old libhdf5).
-- `histomicstk` installed via `--no-deps` with pure-Python runtime deps listed manually (side-steps `openslide-bin` / `GDAL` source-build failures; code paths NuHTC uses are verified).
-- `scikit-image>=0.22,<0.25` (the pinned 0.18.3 is incompatible with numpy 1.26).
-- `mmtrack`, `ts`, `model_archiver`, `pytorch_sphinx_theme` filtered out at install time (never imported by this repo).
+- PyTorch 1.13.1 + CUDA 11.6, `mmcv-full` 1.7.2, `histomicstk` 1.2.10, OpenSlide, and the rest of the NuHTC runtime deps
+- `/workspace/models/pannuke.pth` — the PanNuke checkpoint, ready for `tools/infer.py` and `tools/infer_wsi.py` without any mount
+- A few deliberate pins that differ from the Setup Environment recipe above (full rationale in `DOCKER.md`):
+  - `h5py==3.11.0` pinned (wheel-only, avoids source build against old libhdf5).
+  - `histomicstk` installed via `--no-deps` with pure-Python runtime deps listed manually (side-steps `openslide-bin` / `GDAL` source-build failures; code paths NuHTC uses are verified).
+  - `scikit-image>=0.22,<0.25` (the pinned 0.18.3 is incompatible with numpy 1.26).
+  - `mmtrack`, `ts`, `model_archiver`, `pytorch_sphinx_theme` filtered out at install time (never imported by this repo).
 
 ## 👉 Preprocessing data
 First please download and unzip the files from [PanNuke dataset](https://warwick.ac.uk/fac/cross_fac/tia/data/pannuke), where the folder structure should look like this:
@@ -241,7 +258,7 @@ It will extract the nuclei feature for each image and then store them in a csv f
 
 ## 🧪 Using NuHTC on your own images
 
-The provided checkpoints (PanNuke / CoNSeP / NuCLS / CoNIC) are trained on H&E-stained tumor histopathology at 40× magnification. You can point the inference scripts at your own data by mounting a host directory into the container.
+`ghcr.io/kaneyxx/nuhtc:latest` ships with the PanNuke checkpoint at `/workspace/models/pannuke.pth`, so patch-level and WSI inference run out of the box. The PanNuke weights are trained on H&E-stained tumor histopathology at 40× magnification — see the caveats below before using on other domains.
 
 ### Patch-level inference (your own PNGs)
 
@@ -249,34 +266,84 @@ The provided checkpoints (PanNuke / CoNSeP / NuCLS / CoNIC) are trained on H&E-s
 docker run --gpus all --rm --shm-size=16g \
   -v /path/to/your/pngs:/data/in \
   -v /path/to/output:/data/out \
-  -v $(pwd)/models:/workspace/models \
-  nuhtc:latest -c "python tools/infer.py /data/in \
+  ghcr.io/kaneyxx/nuhtc:latest -c "python tools/infer.py /data/in \
     configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py \
     models/pannuke.pth --output /data/out"
 ```
 
 ### WSI inference (your own slides)
 
+Patches at 512 × 512 (stride 448, overlap 64) with a reduced batch of 8. This matches the paper's larger-patch inference mode and uses roughly the same VRAM as 256 × 256 @ batch 32 while needing ~¼ as many patch passes, so the whole slide finishes faster:
+
 ```shell
 docker run --gpus all --rm --shm-size=16g \
   -v /path/to/your/wsi:/data/wsi \
   -v /path/to/output:/data/out \
-  -v $(pwd)/models:/workspace/models \
-  nuhtc:latest -c "python tools/infer_wsi.py /data/wsi \
+  ghcr.io/kaneyxx/nuhtc:latest -c "python tools/infer_wsi.py /data/wsi \
     configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py \
     models/pannuke.pth --patch --seg --stitch \
-    --patch_size 512 --step_size 448 --batch_size 32 \
+    --patch_size 512 --step_size 448 --batch_size 8 \
     --save_dir /data/out --mode qupath"
+```
+
+If you need strict training-native patches, switch to `--patch_size 256 --step_size 192 --batch_size 32` (uses ~22 GB peak on 24 GB cards; slower end-to-end but matches the training distribution).
+
+After segmentation, merge cross-patch overlapping nuclei (mask-NMS) so each cell appears once in the GeoJSON:
+
+```shell
+docker run --gpus all --rm \
+  -v /path/to/output:/data/out \
+  ghcr.io/kaneyxx/nuhtc:latest -c "python tools/nuclei_merge.py \
+    --geojson /data/out/nuclei/<SLIDE_ID>/<SLIDE_ID>.geojson \
+    --overlap_threshold 0.05 --merge_strategy probability"
+```
+This creates `<SLIDE_ID>_merged.geojson` next to the original (the input file is not modified). Load the `_merged` version in QuPath for cleaner overlays.
+
+### Preserving host-user file ownership
+
+Docker writes files as root by default, which makes it awkward to clean up outputs from the host. Pass `-u $(id -u):$(id -g) -e HOME=/tmp` to have the container write as the calling user:
+
+```shell
+docker run --gpus all --rm --shm-size=16g \
+  -u $(id -u):$(id -g) -e HOME=/tmp \
+  -v /path/to/your/wsi:/data/wsi \
+  -v /path/to/output:/data/out \
+  ghcr.io/kaneyxx/nuhtc:latest -c "python tools/infer_wsi.py /data/wsi \
+    configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py \
+    models/pannuke.pth --patch --seg --stitch \
+    --patch_size 512 --step_size 448 --batch_size 8 \
+    --save_dir /data/out --mode qupath"
+```
+
+### Running detached for long jobs (SSH-safe)
+
+WSI inference on one slide at 40× can take 3–5 hours. To survive SSH disconnects, run detached with `-d` and a name:
+
+```shell
+docker run -d --name nuhtc-run --gpus all --shm-size=16g \
+  -u $(id -u):$(id -g) -e HOME=/tmp \
+  -v /path/to/your/wsi:/data/wsi \
+  -v /path/to/output:/data/out \
+  ghcr.io/kaneyxx/nuhtc:latest -c "python tools/infer_wsi.py /data/wsi ..."
+
+docker logs -f nuhtc-run    # live tail
+docker ps -a --filter name=nuhtc-run    # check status
+docker logs nuhtc-run > /path/to/output/infer.log && docker rm nuhtc-run    # clean up when done
 ```
 
 ### Things to watch out for
 
 1. **File extension.** `tools/infer.py` only globs `*.png`. Convert JPEG/TIFF first, or edit the glob pattern in the script.
-2. **Class labels are dataset-specific.** `pannuke.pth` outputs PanNuke classes `T / I / C / D / E` (Neoplastic, Inflammatory, Connective, Dead, Epithelial) — only meaningful on H&E-stained tumor tissue. IHC, fluorescence, or non-tumor tissue will produce poor classifications (segmentation is usually still workable). For other domains, download the CoNSeP / NuCLS / CoNIC checkpoints and their matching config from the [Google Drive](https://drive.google.com/drive/folders/1MezZrVwx7S6MNYkpMO5ja2D6KcZkRvYo?usp=sharing).
+2. **Class labels are dataset-specific.** `pannuke.pth` outputs PanNuke classes `T / I / C / D / E` (Neoplastic, Inflammatory, Connective, Dead, Epithelial) — only meaningful on H&E-stained tumor tissue. IHC, fluorescence, or non-tumor tissue will produce poor classifications (segmentation is usually still workable). Only `pannuke.pth` is baked into the image; to use the CoNSeP / NuCLS / CoNIC checkpoints, download them and their matching config from the [Google Drive](https://drive.google.com/drive/folders/1MezZrVwx7S6MNYkpMO5ja2D6KcZkRvYo?usp=sharing) and mount the directory:
+   ```shell
+   -v /path/to/your/weights:/workspace/models
+   ```
+   (This shadows the baked PanNuke weight — intended behaviour when you want to override.)
 3. **Magnification.** Training is at 40×. If your WSI is at 20× or 10×, either rescale before inference or expect output coordinates in the wrong units.
 4. **WSI output formats.** `--mode qupath` emits a GeoJSON that drops directly into QuPath. `coco` is patch-level only (for feature extraction). `sql` and `dsa` target their respective databases.
-5. **`--shm-size=16g`.** PyTorch DataLoader workers segfault without this on the pytorch base image — keep it on `docker run`, it is already set in `docker-compose.yml`.
-6. **Demo data shadowing (compose only).** `docker-compose.yml` mounts `./demo` over `/workspace/demo`, which hides the sample images baked into the image. See the `docker-compose.yml` inline comment and the Troubleshooting section of `DOCKER.md` for how to recover the baked samples.
+5. **`--shm-size=16g`.** PyTorch DataLoader workers segfault without this on the pytorch base image — keep it on `docker run`; it is already set in `docker-compose.yml`.
+6. **VRAM ↔ patch-size ↔ batch-size.** The example above (`512 / batch 8`) and the native fallback (`256 / batch 32`) both peak near 22 GB on a 24 GB card. Pushing `512 / batch 32` OOMs. If your GPU has <16 GB, drop `--batch_size` to 4; if you have >32 GB, you can raise batch proportionally.
+7. **QuPath visualisation.** The output `.geojson` drops directly into QuPath; the resulting nuclei overlay on a full slide can exceed 500 MB, so bump QuPath's max memory (Edit → Preferences → Max memory) to 16–32 GB before opening.
 
 ## 🗓️ Ongoing
 - [x] Merge overlapping nuclei when segmenting the WSI
