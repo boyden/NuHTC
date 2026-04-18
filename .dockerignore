@@ -2,6 +2,9 @@
 work_dirs/
 datasets/
 coco/
+tests/
+data/
+*.sh
 # Exclude everything under models/ by default, but keep pannuke.pth so it can
 # be baked into the image for a zero-download "just docker run" experience.
 # To bake other weights, add another `!models/<name>.pth` line here.

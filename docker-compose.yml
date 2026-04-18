@@ -24,21 +24,22 @@ services:
     tty: true
     stdin_open: true
 
+    # No bind mounts by default — /workspace is the image filesystem (baked
+    # models/demo). Uncomment below to use host data for training/testing.
+    #
+    # Example (copy under `nuhtc:` at same indent as `environment:`):
+    #   volumes:
+    #     - ./datasets:/workspace/datasets   # PanNuke numpy masks/images
+    #     - ./coco:/workspace/coco           # COCO JSON annotations
+    #     - ./work_dirs:/workspace/work_dirs # checkpoints, logs, preds
+    # Optional — replace baked weights or demo (creates empty dirs if missing):
+    #     - ./models:/workspace/models
+    #     - ./demo:/workspace/demo
+    #
+    # One-off without editing this file:
+    #   docker compose run --rm -v ./datasets:/workspace/datasets \
+    #     -v ./coco:/workspace/coco -v ./work_dirs:/workspace/work_dirs nuhtc
+
     environment:
       - WANDB_MODE=offline
       - CUDA_VISIBLE_DEVICES=0
-
-    volumes:
-      - ./datasets:/workspace/datasets
-      - ./coco:/workspace/coco
-      - ./work_dirs:/workspace/work_dirs
-      # The image bakes:
-      #   /workspace/models/pannuke.pth    (PanNuke checkpoint)
-      #   /workspace/demo/imgs/*.png       (sample images for tools/infer.py)
-      # The two mounts below would OVERRIDE those baked directories. Uncomment
-      # only if you want to swap in your own weights or feed your own demo
-      # data. If enabled, create the host dirs first (`mkdir -p models demo`)
-      # or compose will create them as root-owned empty dirs and you'll see
-      # "pannuke.pth: no such file" / empty glob results.
-      # - ./models:/workspace/models
-      # - ./demo:/workspace/demo
