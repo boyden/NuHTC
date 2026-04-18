@@ -21,6 +21,8 @@
 ![](./resources/nuhtc.jpg)
 This repo is the official implementation of NuHTC.
 
+**Browser demo on the Hugging Face Space:** [Web demo](https://huggingface.co/spaces/boyden/NuHTC)
+
 ## Overlaid Segmentation and Classification Prediction
 
 The demo may take around 10s to load.
