@@ -6,14 +6,15 @@
 
 <p align="center">
   <a href="https://www.sciencedirect.com/science/article/pii/S1361841525001422">Paper</a> |
-  <a href="#-setup-environment">Setup</a> |
   <a href="#-docker">Docker</a> |
+  <a href="#-setup-environment">Setup</a> |
+  <a href="#-quick-start">Quick start</a> |
+  <a href="#-preprocessing-data">Preprocessing</a> |
   <a href="#-train">Train</a> |
   <a href="#-test">Test</a> |
   <a href="#-infer">Infer</a> |
   <a href="#-segment-the-whole-slide-image">WSI Segmentation</a> |
   <a href="#-extract-the-nuclei-feature">Feature Extraction</a> |
-  <a href="#-using-nuhtc-on-your-own-images">Use on your own images</a> |
   <a href="#-citation">Citation</a>
 </p>
 
@@ -21,11 +22,60 @@
 This repo is the official implementation of NuHTC.
 
 ## Overlaid Segmentation and Classification Prediction
-The demo may take around 10s to load. 
+
+The demo may take around 10s to load.
 ![](./resources/instance_demo.gif)
 
+## 🐳 Docker
+
+Official image on GitHub Container Registry; no separate Python env or weight download. More detail in [`DOCKER.md`](./DOCKER.md).
+
+### Pull & run
+
+```shell
+docker pull ghcr.io/boyden/nuhtc:latest
+```
+
+### Patch-level inference
+
+```shell
+docker run --gpus all --rm --shm-size=32g \
+  -v /path/to/your/pngs:/data/imgs \
+  -v /path/to/output:/data/imgs_infer \
+  ghcr.io/boyden/nuhtc:latest -c "python tools/infer.py /data/imgs \
+    configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py \
+    models/pannuke.pth --output /data/imgs_infer"
+```
+
+### WSI inference
+
+```shell
+# Patches at 256×256 (~40×, stride 192).
+docker run --gpus all --rm --shm-size=32g \
+  -v /path/to/your/pngs:/data/wsi \
+  -v /path/to/output:/data/wsi_infer \
+  ghcr.io/boyden/nuhtc:latest -c "python tools/infer_wsi.py /data/wsi \
+    configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py \
+    models/pannuke.pth --patch --seg --stitch \
+    --patch_size 256 --step_size 192 --batch_size 16 \
+    --save_dir /data/wsi_infer --mode qupath"
+```
+
+After segmentation, merge cross-patch overlapping nuclei (mask-NMS) so each cell appears once in the GeoJSON:
+
+```shell
+docker run --gpus all --rm \
+  -v /path/to/output:/data/wsi_infer \
+  ghcr.io/boyden/nuhtc:latest -c "python tools/nuclei_merge.py \
+    --geojson /data/wsi_infer/nuclei/<SLIDE_ID>/<SLIDE_ID>.geojson \
+    --overlap_threshold 0.05 --merge_strategy probability"
+```
+
+Load the `<SLIDE_ID>_merged.geojson` version in QuPath for cleaner overlays.
+
 ## 👉 Setup Environment
-Setup the Python environment
+
+Set up the Python environment
 
 ```shell script
 # Note, please follow the env.
@@ -39,56 +89,18 @@ pip install mmcv-full==1.7.2 -f https://download.openmmlab.com/mmcv/dist/cu116/t
 python -m pip install histomicstk==1.2.10 --find-links https://girder.github.io/large_image_wheels -i https://pypi.org/simple
 ```
 
-## 🐳 Docker
+## 👉 Quick start
 
-A prebuilt Docker image with `pannuke.pth` **already baked in** is published on GitHub Container Registry. You can go from zero to running inference in one `docker pull` — no Python environment, no weight download. Full notes live in [`DOCKER.md`](./DOCKER.md); this section is the quick start.
+When setup is finished, download `pannuke.pth` from [Google Drive](https://drive.google.com/drive/folders/1MezZrVwx7S6MNYkpMO5ja2D6KcZkRvYo?usp=sharing) and save it as `models/pannuke.pth`. Run:
 
-### Pull & run
-
-```shell
-docker pull ghcr.io/kaneyxx/nuhtc:latest
+```shell script
+python tools/infer.py demo/imgs configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py models/pannuke.pth --out demo/imgs_infer
 ```
 
-Run patch-level inference on your own PNGs — weights are already inside, nothing to mount for the model:
-```shell
-docker run --gpus all --rm --shm-size=16g \
-  -v /path/to/your/pngs:/data/in \
-  -v /path/to/output:/data/out \
-  ghcr.io/kaneyxx/nuhtc:latest -c "python tools/infer.py /data/in \
-    configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py \
-    models/pannuke.pth --output /data/out"
-```
-
-See [Using NuHTC on your own images](#-using-nuhtc-on-your-own-images) for WSI inference and the practical caveats (file extensions, class labels, magnification, shared memory).
-
-### Build from source (optional)
-
-Only needed if you want to modify the image:
-
-```shell
-git clone https://github.com/kaneyxx/NuHTC.git
-cd NuHTC
-# Drop your pannuke.pth (or other checkpoint) into ./models/ to bake it in;
-# otherwise the image builds without weights and you mount them at run time.
-docker build -t nuhtc:latest .
-```
-First build pulls ~6 GB of base image and runs heavy pip installs; budget 20–30 minutes.
-
-### Host requirements
-
-Docker 20.10+, [`nvidia-container-toolkit`](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html), NVIDIA driver ≥ 510 (for CUDA 11.6 runtime). See `DOCKER.md` for install and troubleshooting.
-
-### What the image contains
-
-- PyTorch 1.13.1 + CUDA 11.6, `mmcv-full` 1.7.2, `histomicstk` 1.2.10, OpenSlide, and the rest of the NuHTC runtime deps
-- `/workspace/models/pannuke.pth` — the PanNuke checkpoint, ready for `tools/infer.py` and `tools/infer_wsi.py` without any mount
-- A few deliberate pins that differ from the Setup Environment recipe above (full rationale in `DOCKER.md`):
-  - `h5py==3.11.0` pinned (wheel-only, avoids source build against old libhdf5).
-  - `histomicstk` installed via `--no-deps` with pure-Python runtime deps listed manually (side-steps `openslide-bin` / `GDAL` source-build failures; code paths NuHTC uses are verified).
-  - `scikit-image>=0.22,<0.25` (the pinned 0.18.3 is incompatible with numpy 1.26).
-  - `mmtrack`, `ts`, `model_archiver`, `pytorch_sphinx_theme` filtered out at install time (never imported by this repo).
+Segmentation overlays are saved as PNGs in `demo/imgs_infer`. Open that folder to view results.
 
 ## 👉 Preprocessing data
+
 First please download and unzip the files from [PanNuke dataset](https://warwick.ac.uk/fac/cross_fac/tia/data/pannuke), where the folder structure should look like this:
 
 ```
@@ -115,7 +127,9 @@ NuHTC
 │   │   │   │   ├── types.npy
 ├── ...
 ```
+
 For the coco format annotation, please download the `coco` folder json file from [Google Drive](https://drive.google.com/drive/folders/1MezZrVwx7S6MNYkpMO5ja2D6KcZkRvYo?usp=sharing)
+
 ```
 NuHTC
 ├── ...
@@ -126,7 +140,9 @@ NuHTC
 │   │   ├── PanNuke_annt_RLE_fold3.json
 ├── ...
 ```
-Then generating `png` files for training and testing.
+
+Then, generate `png` files for training and testing.
+
 ```python
 import os
 import numpy as np
@@ -157,15 +173,17 @@ for fold in range(3):
 ```
 
 ## 👉 Train
+
 This is an example of training NuHTC on the first fold. To train on other folds, update the `fold = 1` content in `htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py` to other folds.
 
 ```shell script
 CUDA_VISIBLE_DEVICES=0 python tools/train.py configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py --no-validate
 ```
 
-> Note, recent update (~May 2024, driver version 555.85, 555.99, 556.12) of Nvidia driver may lead to `UnicodeDecodeError: 'utf-8' codec can't decode byte 0xf8 in position 0: invalid start byte` in init wandb package. If your Nvidia driver version is greater than `552.44`, please downgrade to the `Nvidia 552.44 studio driver` or update to a version greater than `560.70` for successfully training the models. For more details, please refer to [wandb issue](https://github.com/wandb/wandb/issues/7683).
+> Note, recent update (~May 2024, driver version 555.85, 555.99, 556.12) of Nvidia driver may lead to `UnicodeDecodeError: 'utf-8' codec can't decode byte 0xf8 in position 0: invalid start byte` in init wandb package. If your Nvidia driver version is greater than `552.44`, downgrade to the `Nvidia 552.44 studio driver` or update to a version newer than `560.70` to train the models successfully. For more details, see the [wandb issue](https://github.com/wandb/wandb/issues/7683).
 
 ## 👉 Test
+
 ``` shell script
 CONFIG_NAME=htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py
 WEIGHT_BASE_PATH=work_dirs/htc_lite_swin_pytorch_seasaw_FPN_AttenROI_thres_96_base_aug_cas_PanNuke_full_epoch_200_fold1
@@ -181,16 +199,20 @@ python tools/analysis_tools/pannuke/compute_stats.py --true_path=datasets/PanNuk
 ```
 
 ## 👉 Infer
+
 Our trained checkpoint can be downloaded from the `models` folder in the [Google Drive](https://drive.google.com/drive/folders/1MezZrVwx7S6MNYkpMO5ja2D6KcZkRvYo?usp=sharing).
+
 ```shell script
 # Segment image by image
 CUDA_VISIBLE_DEVICES=0 python tools/infer.py demo/imgs configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py models/pannuke.pth --out demo/imgs_infer
 ```
 
 ## 🚀 Segment the Whole Slide Image
-Segment for the WSI with support output versions: `qupath`, `sql`, `dsa`, and `coco`. Do not automatically support various magnifications. (Default: 40X).
 
-> Note: we support the version of both nuclei point and contour for qupath format. COCO is only for storing the patch nuclei segmentation results now.
+Run WSI segmentation and export results as `qupath`, `sql`, `dsa`, or `coco`. Magnification is not auto-selected—use the scale that matches your slides (default pipeline assumes 40×).
+
+> Note: QuPath export includes both point and contour representations for nuclei. COCO is currently used only for per-patch segmentation outputs.
+
 1. WSI Segmentation
 
 ```shell script
@@ -198,11 +220,13 @@ CUDA_VISIBLE_DEVICES=0 python tools/infer_wsi.py demo/wsi configs/nuhtc/htc_lite
 --patch --seg --stitch --patch_size 256 --step_size 192 --margin 1 --min_area 10 \
 --batch_size 32 --save_dir demo/wsi_infer --mode qupath
 ```
+
 2. Merge Overlapping Nuclei
 
 After segmentation, mask non-maximum suppression (NMS) is applied to the WSI to remove the overlapping nuclei.
+
 ```shell script
-# The geojson is the directory of the corresponding WSI segmentation geojson filename.
+# --geojson: path to the slide segmentation .geojson file (e.g. from infer_wsi: .../nuclei/<SLIDE_ID>/<SLIDE_ID>.geojson).
 python tools/nuclei_merge.py \
 --geojson demo/wsi_res/TCGA-AC-A2FK-01Z-00-DX1.033F3C27-9860-4EF3-9330-37DE5EC45724.geojson \
 --overlap_threshold 0.05 --merge_strategy probability
@@ -212,9 +236,10 @@ We provide a WSI example from TCGA (filename: `TCGA-AC-A2FK-01Z-00-DX1.033F3C27-
 
 The `dsa` is a format supported by [Digital Slide Archive](https://digitalslidearchive.github.io/digital_slide_archive/), a powerful containerized web-based platform for storing, managing, viewing, and analysing WSIs. If you are interested in using the DSA platform, please refer to its [deployment instructions](https://github.com/DigitalSlideArchive/digital_slide_archive/blob/master/devops/dsa/README.rst).
 
-Our model is trained with a patch size `256×256` at 40X magnification. During inference, it maintains strong performance even when evaluated with a larger patch size of `512×512`. To run inference using `512×512` patches, please specify the arguments `--patch_size 512 --step_size 448`.
+Our model is trained with a patch size `256×256` at 40× magnification. During inference, it maintains strong performance even when evaluated with a larger patch size of `512×512`. To run inference using `512×512` patches, please specify the arguments `--patch_size 512 --step_size 448`.
 
 ## 🔬 Extract the Nuclei Feature
+
 Make sure you have successfully installed the [histomicstk](https://digitalslidearchive.github.io/HistomicsTK/).
 We support two approaches for extracting nucleus features:
 
@@ -223,12 +248,15 @@ We support two approaches for extracting nucleus features:
 2. Tile the WSI and extract the nucleus features from each tile sequentially.
 
 We recommend using the first way. Here is an example:
+
 ```shell script
 # demo/wsi is the path to the folder containing raw WSI image files
 # segdir is the path to the folder containing segmentation files
 python tools/wsi_feat_extract.py demo/wsi --segdir demo/wsi_res --mag 40
 ```
+
 For the second way that tiles images first, please specify `--mode coco` or `--mode all` during WSI inference.
+
 ```shell script
 python tools/nuclei_feat_extract.py demo/wsi_res
 # datadir (str)
@@ -241,12 +269,13 @@ python tools/nuclei_feat_extract.py demo/wsi_res
 # --min_num (int, default: 8)
 # Minimum number of nuclei required in a patch. Patches with fewer nuclei will be excluded.
 # --patch_size (int, default: 512)
-# Size (in pixels) of each image patch. Should match the expected input size (e.g., 256 or 512 for 40X resolution) used during inference.
+# Size (in pixels) of each image patch. Should match the expected input size (e.g., 256 or 512 for 40× resolution) used during inference.
 # --reverse (flag, default: False)
 # If specified, slide IDs will be processed in reverse order.
 ```
 
 It will extract the nuclei feature for each image and then store them in a csv file. The following is an example for the nuclei feature csv file.
+
 |     | Label | Identifier.Xmin | Identifier.Ymin | Identifier.Xmax | Identifier.Ymax | Identifier.CentroidX | Identifier.CentroidY | Identifier.WeightedCentroidX | Identifier.WeightedCentroidY | Orientation.Orientation | Size.Area | Size.ConvexHullArea | Size.MajorAxisLength | Size.MinorAxisLength | Size.Perimeter | Shape.Circularity | Shape.Eccentricity | Shape.EquivalentDiameter | Shape.Extent | Shape.FractalDimension | Shape.MinorMajorAxisRatio | Shape.Solidity | Shape.HuMoments1 | Shape.HuMoments2 | Shape.HuMoments3 | Shape.HuMoments4 | Shape.HuMoments5 | Shape.HuMoments6 | Shape.HuMoments7 | Shape.WeightedHuMoments1 | Shape.WeightedHuMoments2 | Shape.WeightedHuMoments3 | Shape.WeightedHuMoments4 | Shape.WeightedHuMoments5 | Shape.WeightedHuMoments6 | Shape.WeightedHuMoments7 | Shape.FSD1 | Shape.FSD2 | Shape.FSD3 | Shape.FSD4 | Shape.FSD5 | Shape.FSD6 | Nucleus.Intensity.Min | Nucleus.Intensity.Max | Nucleus.Intensity.Mean | Nucleus.Intensity.Median | Nucleus.Intensity.MeanMedianDiff | Nucleus.Intensity.Std | Nucleus.Intensity.IQR | Nucleus.Intensity.MAD | Nucleus.Intensity.Skewness | Nucleus.Intensity.Kurtosis | Nucleus.Intensity.HistEnergy | Nucleus.Intensity.HistEntropy | Nucleus.Gradient.Mag.Mean | Nucleus.Gradient.Mag.Std | Nucleus.Gradient.Mag.Skewness | Nucleus.Gradient.Mag.Kurtosis | Nucleus.Gradient.Mag.HistEntropy | Nucleus.Gradient.Mag.HistEnergy | Nucleus.Gradient.Canny.Sum | Nucleus.Gradient.Canny.Mean | Nucleus.Haralick.ASM.Mean | Nucleus.Haralick.ASM.Range | Nucleus.Haralick.Contrast.Mean | Nucleus.Haralick.Contrast.Range | Nucleus.Haralick.Correlation.Mean | Nucleus.Haralick.Correlation.Range | Nucleus.Haralick.SumOfSquares.Mean | Nucleus.Haralick.SumOfSquares.Range | Nucleus.Haralick.IDM.Mean | Nucleus.Haralick.IDM.Range | Nucleus.Haralick.SumAverage.Mean | Nucleus.Haralick.SumAverage.Range | Nucleus.Haralick.SumVariance.Mean | Nucleus.Haralick.SumVariance.Range | Nucleus.Haralick.SumEntropy.Mean | Nucleus.Haralick.SumEntropy.Range | Nucleus.Haralick.Entropy.Mean | Nucleus.Haralick.Entropy.Range | Nucleus.Haralick.DifferenceVariance.Mean | Nucleus.Haralick.DifferenceVariance.Range | Nucleus.Haralick.DifferenceEntropy.Mean | Nucleus.Haralick.DifferenceEntropy.Range | Nucleus.Haralick.IMC1.Mean | Nucleus.Haralick.IMC1.Range | Nucleus.Haralick.IMC2.Mean | Nucleus.Haralick.IMC2.Range | cell_type | img_id | img_type | img_objs | file_name |
 |-----|-------|-----------------|-----------------|-----------------|-----------------|----------------------|----------------------|------------------------------|------------------------------|-------------------------|-----------|---------------------|----------------------|----------------------|----------------|-------------------|--------------------|--------------------------|--------------|------------------------|---------------------------|----------------|------------------|------------------|------------------|------------------|------------------|------------------|------------------|--------------------------|--------------------------|--------------------------|--------------------------|--------------------------|--------------------------|--------------------------|------------|------------|------------|------------|------------|------------|-----------------------|-----------------------|------------------------|--------------------------|----------------------------------|-----------------------|-----------------------|-----------------------|----------------------------|----------------------------|------------------------------|-------------------------------|---------------------------|--------------------------|-------------------------------|-------------------------------|----------------------------------|---------------------------------|----------------------------|-----------------------------|---------------------------|----------------------------|--------------------------------|---------------------------------|-----------------------------------|------------------------------------|------------------------------------|-------------------------------------|---------------------------|----------------------------|----------------------------------|-----------------------------------|-----------------------------------|------------------------------------|----------------------------------|-----------------------------------|-------------------------------|--------------------------------|------------------------------------------|-------------------------------------------|-----------------------------------------|------------------------------------------|----------------------------|-----------------------------|----------------------------|-----------------------------|-----------|--------|----------|----------|-----------|
 | 211 | 1     | 322             | 402             | 356             | 442             | 338.111              | 421.776              | 337.964                      | 422.038                      | 0.319                   | 1028.000  | 1079.000            | 40.400               | 32.539               | 131.698        | 0.745             | 0.593              | 36.179                   | 0.756        | 0.851                  | 0.805                     | 0.953          | 0.164            | 0.001            | 0.000            | 0.000            | -0.000           | -0.000           | -0.000           | 0.001                    | 0.000                    | 0.000                    | 0.000                    | 0.000                    | -0.000                   | 0.000                    | 0.231      | 0.003      | 0.004      | 0.006      | 0.119      | 0.307      | 94.000                | 251.000               | 210.930                | 214.000                  | -3.070                           | 21.928                | 26.000                | 13.000                | -1.193                     | 2.762                      | 0.224                        | 1.677                         | 10.849                    | 10.623                   | 1.933                         | 3.910                         | 1.394                            | 0.340                           | 139.000                    | 0.135                       | 0.021                     | 0.005                      | 4.897                          | 4.211                           | 0.950                             | 0.045                              | 49.706                             | 2.771                               | 0.563                     | 0.080                      | 44.098                           | 0.556                             | 193.929                           | 15.296                             | 5.182                            | 0.058                             | 6.760                         | 0.383                          | 0.008                                    | 0.002                                     | 2.252                                   | 0.432                                    | -0.399                     | 0.107                       | 0.982                      | 0.017                       | E         | 28     | C        | 32       | 28.png    |
@@ -255,100 +284,14 @@ It will extract the nuclei feature for each image and then store them in a csv f
 | 214 | 4     | 328             | 448             | 360             | 486             | 342.695              | 466.659              | 342.382                      | 466.577                      | -0.532                  | 904.000   | 954.000             | 40.653               | 28.492               | 124.870        | 0.729             | 0.713              | 33.927                   | 0.743        | 1.074                  | 0.701                     | 0.948          | 0.170            | 0.003            | 0.000            | 0.000            | 0.000            | 0.000            | 0.000            | 0.001                    | 0.000                    | 0.000                    | 0.000                    | -0.000                   | -0.000                   | 0.000                    | 0.420      | 0.000      | 0.002      | 0.006      | 0.138      | 0.202      | 101.000               | 245.000               | 185.750                | 184.000                  | 1.750                            | 25.644                | 30.000                | 15.000                | -0.014                     | -0.012                     | 0.165                        | 1.969                         | 9.395                     | 5.312                    | 0.851                         | 0.642                         | 2.006                            | 0.154                           | 150.000                    | 0.166                       | 0.017                     | 0.006                      | 1.786                          | 1.359                           | 0.963                             | 0.030                              | 24.275                             | 1.308                               | 0.597                     | 0.142                      | 40.420                           | 0.426                             | 95.315                            | 6.510                              | 5.173                            | 0.044                             | 6.450                         | 0.509                          | 0.010                                    | 0.003                                     | 1.754                                   | 0.396                                    | -0.464                     | 0.125                       | 0.989                      | 0.012                       | E         | 28     | C        | 32       | 28.png    |
 | 215 | 5     | 266             | 404             | 316             | 454             | 290.478              | 427.398              | 290.924                      | 427.688                      | -0.785                  | 1808.000  | 1892.000            | 60.816               | 38.141               | 180.770        | 0.695             | 0.779              | 47.979                   | 0.723        | 0.826                  | 0.627                     | 0.956          | 0.178            | 0.006            | 0.000            | 0.000            | 0.000            | 0.000            | -0.000           | 0.001                    | 0.000                    | 0.000                    | 0.000                    | 0.000                    | 0.000                    | -0.000                   | 0.508      | 0.005      | 0.009      | 0.012      | 0.009      | 0.212      | 70.000                | 255.000               | 196.299                | 201.000                  | -4.701                           | 30.024                | 36.000                | 18.000                | -0.886                     | 1.016                      | 0.189                        | 1.841                         | 12.020                    | 10.098                   | 2.042                         | 4.591                         | 1.457                            | 0.298                           | 346.000                    | 0.191                       | 0.012                     | 0.004                      | 4.300                          | 4.445                           | 0.952                             | 0.051                              | 44.963                             | 1.119                               | 0.530                     | 0.129                      | 41.760                           | 0.324                             | 175.550                           | 8.610                              | 5.444                            | 0.032                             | 7.176                         | 0.562                          | 0.008                                    | 0.003                                     | 2.204                                   | 0.547                                    | -0.393                     | 0.131                       | 0.984                      | 0.020                       | E         | 28     | C        | 32       | 28.png    |
 
-
-## 🧪 Using NuHTC on your own images
-
-`ghcr.io/kaneyxx/nuhtc:latest` ships with the PanNuke checkpoint at `/workspace/models/pannuke.pth`, so patch-level and WSI inference run out of the box. The PanNuke weights are trained on H&E-stained tumor histopathology at 40× magnification — see the caveats below before using on other domains.
-
-### Patch-level inference (your own PNGs)
-
-```shell
-docker run --gpus all --rm --shm-size=16g \
-  -v /path/to/your/pngs:/data/in \
-  -v /path/to/output:/data/out \
-  ghcr.io/kaneyxx/nuhtc:latest -c "python tools/infer.py /data/in \
-    configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py \
-    models/pannuke.pth --output /data/out"
-```
-
-### WSI inference (your own slides)
-
-Patches at 512 × 512 (stride 448, overlap 64) with a reduced batch of 8. This matches the paper's larger-patch inference mode and uses roughly the same VRAM as 256 × 256 @ batch 32 while needing ~¼ as many patch passes, so the whole slide finishes faster:
-
-```shell
-docker run --gpus all --rm --shm-size=16g \
-  -v /path/to/your/wsi:/data/wsi \
-  -v /path/to/output:/data/out \
-  ghcr.io/kaneyxx/nuhtc:latest -c "python tools/infer_wsi.py /data/wsi \
-    configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py \
-    models/pannuke.pth --patch --seg --stitch \
-    --patch_size 512 --step_size 448 --batch_size 8 \
-    --save_dir /data/out --mode qupath"
-```
-
-If you need strict training-native patches, switch to `--patch_size 256 --step_size 192 --batch_size 32` (uses ~22 GB peak on 24 GB cards; slower end-to-end but matches the training distribution).
-
-After segmentation, merge cross-patch overlapping nuclei (mask-NMS) so each cell appears once in the GeoJSON:
-
-```shell
-docker run --gpus all --rm \
-  -v /path/to/output:/data/out \
-  ghcr.io/kaneyxx/nuhtc:latest -c "python tools/nuclei_merge.py \
-    --geojson /data/out/nuclei/<SLIDE_ID>/<SLIDE_ID>.geojson \
-    --overlap_threshold 0.05 --merge_strategy probability"
-```
-This creates `<SLIDE_ID>_merged.geojson` next to the original (the input file is not modified). Load the `_merged` version in QuPath for cleaner overlays.
-
-### Preserving host-user file ownership
-
-Docker writes files as root by default, which makes it awkward to clean up outputs from the host. Pass `-u $(id -u):$(id -g) -e HOME=/tmp` to have the container write as the calling user:
-
-```shell
-docker run --gpus all --rm --shm-size=16g \
-  -u $(id -u):$(id -g) -e HOME=/tmp \
-  -v /path/to/your/wsi:/data/wsi \
-  -v /path/to/output:/data/out \
-  ghcr.io/kaneyxx/nuhtc:latest -c "python tools/infer_wsi.py /data/wsi \
-    configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py \
-    models/pannuke.pth --patch --seg --stitch \
-    --patch_size 512 --step_size 448 --batch_size 8 \
-    --save_dir /data/out --mode qupath"
-```
-
-### Running detached for long jobs (SSH-safe)
-
-WSI inference on one slide at 40× can take 3–5 hours. To survive SSH disconnects, run detached with `-d` and a name:
-
-```shell
-docker run -d --name nuhtc-run --gpus all --shm-size=16g \
-  -u $(id -u):$(id -g) -e HOME=/tmp \
-  -v /path/to/your/wsi:/data/wsi \
-  -v /path/to/output:/data/out \
-  ghcr.io/kaneyxx/nuhtc:latest -c "python tools/infer_wsi.py /data/wsi ..."
-
-docker logs -f nuhtc-run    # live tail
-docker ps -a --filter name=nuhtc-run    # check status
-docker logs nuhtc-run > /path/to/output/infer.log && docker rm nuhtc-run    # clean up when done
-```
-
-### Things to watch out for
-
-1. **File extension.** `tools/infer.py` only globs `*.png`. Convert JPEG/TIFF first, or edit the glob pattern in the script.
-2. **Class labels are dataset-specific.** `pannuke.pth` outputs PanNuke classes `T / I / C / D / E` (Neoplastic, Inflammatory, Connective, Dead, Epithelial) — only meaningful on H&E-stained tumor tissue. IHC, fluorescence, or non-tumor tissue will produce poor classifications (segmentation is usually still workable). Only `pannuke.pth` is baked into the image; to use the CoNSeP / NuCLS / CoNIC checkpoints, download them and their matching config from the [Google Drive](https://drive.google.com/drive/folders/1MezZrVwx7S6MNYkpMO5ja2D6KcZkRvYo?usp=sharing) and mount the directory:
-   ```shell
-   -v /path/to/your/weights:/workspace/models
-   ```
-   (This shadows the baked PanNuke weight — intended behaviour when you want to override.)
-3. **Magnification.** Training is at 40×. If your WSI is at 20× or 10×, either rescale before inference or expect output coordinates in the wrong units.
-4. **WSI output formats.** `--mode qupath` emits a GeoJSON that drops directly into QuPath. `coco` is patch-level only (for feature extraction). `sql` and `dsa` target their respective databases.
-5. **`--shm-size=16g`.** PyTorch DataLoader workers segfault without this on the pytorch base image — keep it on `docker run`; it is already set in `docker-compose.yml`.
-6. **VRAM ↔ patch-size ↔ batch-size.** The example above (`512 / batch 8`) and the native fallback (`256 / batch 32`) both peak near 22 GB on a 24 GB card. Pushing `512 / batch 32` OOMs. If your GPU has <16 GB, drop `--batch_size` to 4; if you have >32 GB, you can raise batch proportionally.
-7. **QuPath visualisation.** The output `.geojson` drops directly into QuPath; the resulting nuclei overlay on a full slide can exceed 500 MB, so bump QuPath's max memory (Edit → Preferences → Max memory) to 16–32 GB before opening.
-
 ## 🗓️ Ongoing
-- [x] Merge overlapping nuclei when segmenting the WSI
+
+- [x] Merge overlapping nuclei during WSI segmentation
+- [x] Support nuclei feature extraction from WSIs
+- [x] Add support for Docker
 
 ## 📖 Citation
+
 ```
 @article{li2025nuhtc,
   title={NuHTC: A hybrid task cascade for nuclei instance segmentation and classification},
