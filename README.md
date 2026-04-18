@@ -28,7 +28,7 @@ The demo may take around 10s to load.
 
 ## 🐳 Docker
 
-Official image on GitHub Container Registry; no separate Python env or weight download. More detail in [`DOCKER.md`](./DOCKER.md).
+The official image is on GitHub Container Registry. No local Python environment or separate weight download is required. See [`DOCKER.md`](./DOCKER.md) for details.
 
 ### Pull & run
 
