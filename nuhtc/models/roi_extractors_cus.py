@@ -200,6 +200,7 @@ class AttentionRoIExtractor(BaseRoIExtractor):
         out_size = self.roi_layers[0].output_size
 
         num_levels = len(feats)
+        roi_dtype = torch.float16 if feats[0].is_cuda else torch.float32
         roi_feats = feats[0].new_zeros(
             rois.size(0), self.out_channels, *out_size)
 
@@ -227,7 +228,7 @@ class AttentionRoIExtractor(BaseRoIExtractor):
                 roi_loc_uni, roi_loc_inverse = roi_loc.unique(dim=0, return_inverse=True)
                 roi_loc_uni = roi_loc_uni.to(torch.long)
 
-                feat = feats[i].to(torch.float16)
+                feat = feats[i].to(roi_dtype)
                 roi_vec = feat[roi_loc_uni[:, 0], :, roi_loc_uni[:, 1], roi_loc_uni[:, 2]].clone().detach()
                 feat_vec = feat[roi_loc_uni[:, 0]].permute(0, 2, 3, 1).view(-1, feat_shape[2]*feat_shape[3], feat_shape[1]).clone().detach()
                 roi_sim = F.relu(F.cosine_similarity(roi_vec.unsqueeze(1), feat_vec, dim=2)-self.thres) + self.thres
