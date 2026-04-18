@@ -1,0 +1,44 @@
+services:
+  nuhtc:
+    image: nuhtc:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    # GPU access via nvidia-container-toolkit (compose >= 1.28).
+    # Using shm_size instead of ipc: host to avoid sharing the host IPC
+    # namespace — shm_size gives DataLoader workers enough shared memory
+    # while keeping the container isolated. Switch to ipc: host only if
+    # you need >16 GB of shared memory or encounter NCCL multi-GPU issues.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    shm_size: '16gb'
+
+    working_dir: /workspace
+    tty: true
+    stdin_open: true
+
+    environment:
+      - WANDB_MODE=offline
+      - CUDA_VISIBLE_DEVICES=0
+
+    volumes:
+      - ./datasets:/workspace/datasets
+      - ./coco:/workspace/coco
+      - ./work_dirs:/workspace/work_dirs
+      # The image bakes:
+      #   /workspace/models/pannuke.pth    (PanNuke checkpoint)
+      #   /workspace/demo/imgs/*.png       (sample images for tools/infer.py)
+      # The two mounts below would OVERRIDE those baked directories. Uncomment
+      # only if you want to swap in your own weights or feed your own demo
+      # data. If enabled, create the host dirs first (`mkdir -p models demo`)
+      # or compose will create them as root-owned empty dirs and you'll see
+      # "pannuke.pth: no such file" / empty glob results.
+      # - ./models:/workspace/models
+      # - ./demo:/workspace/demo

@@ -58,3 +58,10 @@ launch.py
 
 coco
 coco/
+
+#docker
+nuhtc-latest.tar.gz
+*.tar.gz
+
+#omc scratch (build watchdog, PRD, progress log used during docker packaging)
+.omc/
