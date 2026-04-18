@@ -54,7 +54,7 @@ docker run --gpus all --rm --shm-size=32g \
 ```shell
 # Patches at 256×256 (~40×, stride 192).
 docker run --gpus all --rm --shm-size=32g \
-  -v /path/to/your/pngs:/data/wsi \
+  -v /path/to/your/input:/data/wsi \
   -v /path/to/output:/data/wsi_infer \
   ghcr.io/boyden/nuhtc:latest -c "python tools/infer_wsi.py /data/wsi \
     configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py \
