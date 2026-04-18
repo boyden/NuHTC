@@ -28,8 +28,6 @@ docker run --gpus all --rm --shm-size=16g \
 
 When the run finishes, open `demo/imgs_infer` in your file browser to view the results.
 
-See [Running containers](#running-containers) for details.
-
 ---
 
 ## Prerequisites
