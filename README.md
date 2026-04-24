@@ -45,7 +45,7 @@ docker run --gpus all --rm --shm-size=32g \
   -v /path/to/your/pngs:/data/imgs \
   -v /path/to/output:/data/imgs_infer \
   ghcr.io/boyden/nuhtc:latest -c "python tools/infer.py /data/imgs \
-    configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py \
+    models/htc_lite_PanNuke_infer.py \
     models/pannuke.pth --output /data/imgs_infer"
 ```
 
@@ -57,7 +57,7 @@ docker run --gpus all --rm --shm-size=32g \
   -v /path/to/your/input:/data/wsi \
   -v /path/to/output:/data/wsi_infer \
   ghcr.io/boyden/nuhtc:latest -c "python tools/infer_wsi.py /data/wsi \
-    configs/nuhtc/htc_lite_swin_pytorch_fpn_PanNuke_seasaw_CAS.py \
+    models/htc_lite_PanNuke_infer.py \
     models/pannuke.pth --patch --seg --stitch \
     --patch_size 256 --step_size 192 --batch_size 16 \
     --save_dir /data/wsi_infer --mode qupath"
