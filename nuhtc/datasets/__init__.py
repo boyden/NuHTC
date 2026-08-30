@@ -8,6 +8,7 @@ from .WSI_coco_PanNuke import PanNukeCocoDataset
 from .WSI_coco_CoNSeP import  CoNSePCocoDataset
 from .WSI_coco_NuCLS import NuCLSCocoDataset
 from .WSI_coco_CoNIC import CoNICCocoDataset
+from .WSI_coco_NuData import NuDataCocoDataset
 from .samplers import DistributedGroupSemiBalanceSampler
 from .assigners import MaskIoUAssigner
 
@@ -23,4 +24,5 @@ __all__ = [
     "CoNSePCocoDataset",
     "NuCLSCocoDataset",
     "CoNICCocoDataset",
+    "NuDataCocoDataset",
 ]

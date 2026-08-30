@@ -50,7 +50,7 @@ class ImageDataset(Dataset):
             image_paths (list): List of image file paths
         """
         self.image_paths = image_paths
-        self._id = 0
+        # self._id = 0
     
     def __len__(self):
         return len(self.image_paths)
@@ -60,9 +60,9 @@ class ImageDataset(Dataset):
 
         img = np.array(Image.open(img_path).convert('RGB'))
         h, w = img.shape[:2]
-        self._id += 1
+        # self._id += 1
         return img, {
-            'id': self._id,
+            'id': idx+1,
             'file_name': os.path.basename(img_path),
             'img_path': img_path,
             'height': h,
@@ -99,8 +99,14 @@ def mask_nms(masks, pred_scores, thr=0.9, min_area=None):
     for i in range(mask_len):
         if not keep_idx[i]:
             continue
+        for j in range(i + 1, mask_len):
+            if not keep_idx[j]:
+                continue
+            tmp_iou = mask_iou[i, j]
+            if tmp_iou > thr:
+                keep_idx[j] = 0
         # Vectorized elimination of subsequent masks with high IoU
-        keep_idx[i+1:] &= (mask_iou[i, i+1:] <= thr)
+        # keep_idx[i+1:] &= (mask_iou[i, i+1:] <= thr)
     return tmp_masks[keep_idx==1].tolist(), sort_idx[keep_idx==1]
 
 
@@ -183,14 +189,17 @@ def parse_args():
     parser.add_argument(
         '--mask-nms-thr',
         type=float,
-        default=0.05,
-        help='IoU threshold for mask NMS (default: 0.05, set to 0 to disable)'
+        default=0.1,
+        help='IoU threshold for mask NMS (default: 0.1, set to 0 to disable)'
     )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+    if os.path.exists(args.output):
+        print(f"Skipping {args.output}.")
+        return
     
     # Load CSV
     print(f"Loading CSV from {args.csv}...")
@@ -219,8 +228,15 @@ def main():
     # Adjust scale factor for magnification
     for test_pipe in cfg['data']['test']['pipeline']:
         if test_pipe['type'] == 'MultiScaleFlipAug':
-            test_pipe['scale_factor'] = float(80 / args.mag)
-            print(f'Scale factor set to: {test_pipe["scale_factor"]}')
+            scale_factor = float(80 / args.mag)
+            test_pipe['scale_factor'] = scale_factor
+            print(f'MultiScaleFlipAug scale factor set to: {test_pipe["scale_factor"]}')
+            # Also update SmartResize if it exists in transforms
+            if 'transforms' in test_pipe:
+                for transform in test_pipe['transforms']:
+                    if transform['type'] == 'SmartResize':
+                        transform['scale_factor'] = scale_factor
+                        print(f'SmartResize scale factor set to: {transform["scale_factor"]}')
     
     model = init_detector(cfg, args.checkpoint, device=args.device)
     MAIN_CLASSES = ('T', 'I', 'C', 'D', 'E')
@@ -248,7 +264,7 @@ def main():
     )
     
     # Process images in batches
-    nuclei_id = 0
+    nuclei_id = 1
     vis_count = 0
     
     # Create visualization directory if specified
@@ -292,9 +308,9 @@ def main():
                 # Mask NMS
                 tmp_masks, nms_idx = mask_nms(seg_mask[mask_id], fg_scores[mask_id], thr=args.mask_nms_thr)
                 
+                rle_mask[mask_id] = tmp_masks
                 bbox_results[mask_id] = bbox_results[mask_id][nms_idx]
                 seg_mask[mask_id] = seg_mask[mask_id][nms_idx]
-                rle_mask[mask_id] = tmp_masks
                 labels[mask_id] = labels[mask_id][nms_idx]
                 fg_scores[mask_id] = fg_scores[mask_id][nms_idx]
                 

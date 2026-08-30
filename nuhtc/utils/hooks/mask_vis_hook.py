@@ -282,7 +282,13 @@ class Mask_Vis_Hook(Hook):
             data = next(runner.data_loader).copy()
         if isinstance(runner, mmcv.runner.epoch_based_runner.EpochBasedRunner):
             self.CLASSES = runner.data_loader.dataset.CLASSES
-            data = next(iter(runner.data_loader)).copy()
+            # reuse the batch just trained on. iter(runner.data_loader) builds a
+            # second worker pool with its own prefetch queue, which doubles the
+            # resident batches and can exhaust the job's memory limit
+            data = getattr(runner, 'data_batch', None)
+            if data is None:
+                return
+            data = data.copy()
 
         if isinstance(runner.model.module, mmdet.models.detectors.yolact.YOLACT):
             self.vis_yolo(runner, data)

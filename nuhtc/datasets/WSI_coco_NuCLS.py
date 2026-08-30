@@ -200,7 +200,7 @@ class NuCLSCocoDataset(WSICocoDataset):
                 pred_mask_li = seg_mask[idx]
                 pred_score_li = fg_scores[idx]
                 if len(pred_mask_li) != 0:
-                    pred_mask_li, nms_idx = self.mask_nms(pred_mask_li, pred_score_li, thr=0.05)
+                    pred_mask_li, nms_idx = self.mask_nms(pred_mask_li, pred_score_li, thr=0.1)
                 out = {
                     'boxes': bbox_results[idx][:, :4][nms_idx],
                     'labels': labels[idx][nms_idx] + 1,

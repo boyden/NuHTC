@@ -523,7 +523,7 @@ def main():
                     continue
                 
                 # Mask NMS
-                tmp_masks, nms_idx = mask_nms(seg_mask[mask_id], fg_scores[mask_id], thr=0.05)
+                tmp_masks, nms_idx = mask_nms(seg_mask[mask_id], fg_scores[mask_id], thr=0.1)
                 bbox_results[mask_id] = bbox_results[mask_id][nms_idx]
                 seg_mask[mask_id] = seg_mask[mask_id][nms_idx]
                 rle_mask[mask_id] = tmp_masks

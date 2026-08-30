@@ -149,6 +149,17 @@ class SmartResize(Resize):
         target_h = get_target(h)
         target_w = get_target(w)
             
+        # Pad zero to the right and bottom to reach target size
+        # if target_h > h or target_w > w:
+        #     pad_h = target_h - h
+        #     pad_w = target_w - w
+        #     results['img'] = np.pad(results['img'], ((0, pad_h), (0, pad_w), (0, 0)), mode='constant', constant_values=0)
+        #     results['img_shape'] = results['img'].shape
+        #     results['ori_shape'] = results['img'].shape
+        #     # Also pad semantic segmentation map if it exists
+        #     for key in results.get('seg_fields', []):
+        #         results[key] = np.pad(results[key], ((0, pad_h), (0, pad_w)), mode='constant', constant_values=0)
+
         # Set the dynamic scale for the parent Resize class to use
         # results['scale'] is expected to be (w, h)
         results['scale'] = (int(target_w * self.factor), int(target_h * self.factor))

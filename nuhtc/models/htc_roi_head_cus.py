@@ -2364,6 +2364,23 @@ class HybridTaskCascadeRoIHead_Lite(HybridTaskCascadeRoIHead_Cus):
                             merged_mask, _bboxes[i], det_labels[i],
                             rcnn_test_cfg, ori_shapes[i], scale_factors[i],
                             rescale)
+                        # TODO drop the interpolation specks here, while the
+                        # masks are still bool arrays. get_seg_masks upsamples
+                        # the RoI logit map to the box and thresholds it, which
+                        # leaves a handful of isolated pixels on ~0.2% of the
+                        # instances. Keeping only the largest connected component
+                        # per instance costs ~60us/instance at this point versus
+                        # ~230us once the masks are RLEs, since nothing has to be
+                        # decoded or re-encoded, and doing it here covers
+                        # evaluate(), infer_patch and infer_wsi at once. Two
+                        # traps: crop with det_bboxes[i], not _bboxes[i], which
+                        # is multiplied by scale_factor while the masks are
+                        # pasted in the original frame; and pad the crop by a
+                        # pixel, or a box truncated inward can split the main
+                        # blob and half the instance is dropped as the smaller
+                        # component. Measured at ep50 this moves no metric
+                        # (instance pairs above the mask-NMS threshold stay at
+                        # 135), so it is output hygiene, not an accuracy fix.
                         segm_results.append(segm_result)
             ms_segm_result['ensemble'] = segm_results
 

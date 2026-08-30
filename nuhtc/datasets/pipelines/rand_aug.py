@@ -22,6 +22,27 @@ from .geo_utils import GeometricTransformationBase as GTrans
 PARAMETER_MAX = 10
 
 
+def apply_mask_op(masks, op, *args, **kwargs):
+    """Run a warpAffine-backed BitmapMasks op one instance at a time.
+
+    ``BitmapMasks.translate/shear/rotate`` stack every instance into a channel
+    and hand the array to cv2, which caps channels at CV_CN_MAX (512), so dense
+    images abort there. Looping is how mmdet implements ``resize``/``flip``/
+    ``pad``, gives identical output, and is several times faster here because
+    cv2.warpAffine degrades badly on high-channel-count arrays.
+    """
+    if not isinstance(masks, BitmapMasks) or len(masks) <= 1:
+        return getattr(masks, op)(*args, **kwargs)
+    parts = [
+        getattr(masks[i:i + 1], op)(*args, **kwargs) for i in range(len(masks))
+    ]
+    return BitmapMasks(
+        np.concatenate([p.masks for p in parts], axis=0),
+        parts[0].height,
+        parts[0].width,
+    )
+
+
 def int_parameter(level, maxval, max_level=None):
     if max_level is None:
         max_level = PARAMETER_MAX
@@ -458,7 +479,9 @@ class RandTranslate(GeometricAugmentation):
         h, w, c = results["img_shape"]
         for key in results.get("mask_fields", []):
             masks = results[key]
-            results[key] = masks.translate((h, w), offset, direction, fill_val)
+            results[key] = apply_mask_op(
+                masks, "translate", (h, w), offset, direction, fill_val
+            )
 
     def _translate_seg(self, results, offset, direction="horizontal", fill_val=0):
         """Translate segmentation maps horizontally or vertically."""
@@ -585,7 +608,9 @@ class RandRotate(GeometricAugmentation):
         h, w, c = results["img_shape"]
         for key in results.get("mask_fields", []):
             masks = results[key]
-            results[key] = masks.rotate((h, w), angle, center, scale, fill_val)
+            results[key] = apply_mask_op(
+                masks, "rotate", (h, w), angle, center, scale, fill_val
+            )
 
     def _rotate_seg(self, results, angle, center=None, scale=1.0, fill_val=255):
         """Rotate the segmentation map."""
@@ -729,7 +754,9 @@ class RandShear(GeometricAugmentation):
         h, w, c = results["img_shape"]
         for key in results.get("mask_fields", []):
             masks = results[key]
-            results[key] = masks.shear(
+            results[key] = apply_mask_op(
+                masks,
+                "shear",
                 (h, w),
                 magnitude,
                 direction,

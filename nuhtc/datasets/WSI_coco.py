@@ -421,7 +421,7 @@ class WSICocoDataset(CocoDataset):
                         log_image(f"evaluate/fp seg", img_fp_seg, interval=1)
 
                 if len(pred_mask_li) != 0:
-                    pred_mask_li, nms_idx = self.mask_nms(pred_mask_li, pred_score_li, thr=0.05)
+                    pred_mask_li, nms_idx = self.mask_nms(pred_mask_li, pred_score_li, thr=0.1)
                     labels[idx] = labels[idx][nms_idx]
 
                 # TODO hard to swap to multi process due to large image numbers

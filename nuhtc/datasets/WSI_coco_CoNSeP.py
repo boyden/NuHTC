@@ -300,7 +300,7 @@ class CoNSePCocoDataset(WSICocoDataset):
                 pred_scores = pred_scores_dict[img_id]
                 pred_labels = pred_labels_dict[img_id]
 
-                pred_masks, nms_idx = self.mask_nms(pred_masks, pred_scores, thr=0.02)
+                pred_masks, nms_idx = self.mask_nms(pred_masks, pred_scores, thr=0.1)
                 pred_labels = np.array(pred_labels)[nms_idx]
                 # TODO hard to swap to multi process due to large image numbers
                 tmp_res = self.stat_calc(true_masks, pred_masks, match_iou=0.5)
