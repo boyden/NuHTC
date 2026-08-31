@@ -2,20 +2,29 @@
 """
 Script to segment nuclei from images listed in a CSV file and save results in COCO format.
 
+Each row of the CSV is one image, segmented as a whole. Images too large to fit
+the model's field of view can instead be cut into patches with ``--patch``,
+which follows ``tools/infer_wsi.py``: patches of ``--patch_size`` every
+``--step_size``, instances touching a patch edge dropped by ``--margin``, mask
+NMS within the patch, and no comparison between patches. Coordinates in the
+output are always full-image, so a nucleus does not have to be tracked back to
+the patch it came from.
+
 Usage:
 python tools/infer_patch.py \
     --csv data/labels.csv \
     --config configs/config.py \
     --checkpoint models/checkpoint.pth \
     --output output/nuclei_coco.json \
-    --score-thr 0.35 \
     --device cuda \
     --mag 40 \
     --batch-size 32
 
+Patched, for images larger than a training crop:
+python tools/infer_patch.py ... --patch --patch_size 512 --step_size 448
+
 """
 
-import time
 import os
 import sys
 import json
@@ -23,9 +32,8 @@ import argparse
 import pandas as pd
 import numpy as np
 
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-from PIL import Image, ImageDraw, ImageFont
+import cv2
+from PIL import Image, ImageDraw
 from tqdm import tqdm
 from pycocotools import coco
 from torch.utils.data import Dataset, DataLoader
@@ -38,8 +46,12 @@ sys.path.insert(0, proj_path)
 import mmcv
 from mmcv import Config
 from mmdet.apis import inference_detector
-from nuhtc.apis.inference import init_detector, save_result
+from nuhtc.apis.inference import init_detector
 from nuhtc.utils import patch_config
+
+
+INST_COLORS = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0],
+               [255, 0, 255]]
 
 
 class ImageDataset(Dataset):
@@ -68,6 +80,23 @@ class ImageDataset(Dataset):
             'height': h,
             'width': w
         }
+
+
+class PatchDataset(Dataset):
+    """The patches of one image, the role Whole_Slide_Bag_FP plays for a slide."""
+    def __init__(self, img, size, step):
+        self.img = img
+        self.size = size
+        self.coords = [(x, y)
+                       for y in patch_origins(img.shape[0], size, step)
+                       for x in patch_origins(img.shape[1], size, step)]
+
+    def __len__(self):
+        return len(self.coords)
+
+    def __getitem__(self, idx):
+        x, y = self.coords[idx]
+        return self.img[y:y + self.size, x:x + self.size], (x, y)
 
 
 def collate_fn(batch):
@@ -110,6 +139,169 @@ def mask_nms(masks, pred_scores, thr=0.9, min_area=None):
     return tmp_masks[keep_idx==1].tolist(), sort_idx[keep_idx==1]
 
 
+def patch_origins(length, size, step):
+    """Patch start coordinates along one axis, the last one flush with the end.
+
+    Walking in strides of ``step`` usually leaves a remainder narrower than a
+    patch, so a final patch is anchored to the far edge. It overlaps its
+    predecessor more than the others do, which costs a little compute but keeps
+    every pixel covered at full patch context.
+    """
+    if length <= size:
+        return [0]
+    xs = list(range(0, length - size + 1, step))
+    if xs[-1] + size < length:
+        xs.append(length - size)
+    return xs
+
+
+def paste_rle(mask, x, y, shape):
+    """RLE of a patch-local mask placed on a full-image canvas."""
+    canvas = np.zeros(shape, dtype=np.uint8)
+    canvas[y:y + mask.shape[0], x:x + mask.shape[1]] = mask
+    return coco.maskUtils.encode(np.asfortranarray(canvas))
+
+
+def infer_patch(model, img, args):
+    """Segment one image patch by patch, in full-image coordinates.
+
+    The same recipe as tools/infer_wsi.py: instances whose box comes within
+    --margin of a patch edge are dropped as truncated, small ones are dropped,
+    mask NMS runs within the patch, and what survives is placed back into the
+    image. Unlike infer_wsi.py, overlapping patches then get a second mask NMS
+    across the whole image, without which the nuclei inside an overlap are
+    reported once per patch that sees them.
+
+    Returns what the unpatched path returns: full-image RLEs, scores and
+    labels.
+    """
+    img_h, img_w = img.shape[:2]
+    dataset = PatchDataset(img, args.patch_size, args.step_size or args.patch_size)
+    infer_dataloader = DataLoader(dataset, batch_size=args.batch_size,
+                                  num_workers=args.num_workers,
+                                  collate_fn=collate_fn)
+
+    rles, scores, labels = [], [], []
+    for patches, coords in tqdm(infer_dataloader, leave=False,
+                                desc=f'{len(dataset)} patches'):
+        results = inference_detector(model, patches)
+        for (x, y), res in zip(coords, results):
+            masks, _, patch_scores, patch_labels = post_process(
+                res, args.min_area, args.mask_nms_thr, margin=args.margin)
+            if len(masks) == 0:
+                continue
+            rles += [paste_rle(m, x, y, (img_h, img_w)) for m in masks]
+            scores.append(patch_scores)
+            labels.append(patch_labels)
+
+    if not rles:
+        return [], np.zeros(0), np.zeros(0, dtype=np.int32)
+    scores, labels = np.concatenate(scores), np.concatenate(labels)
+
+    # Mask NMS again, now across the whole image. Patches overlap wherever the
+    # last one of a row was pulled back to sit flush with the edge, and always
+    # when step_size < patch_size; the nuclei in there were seen by two patches
+    # and the per-patch NMS could not know about the other copy
+    rles, keep = mask_nms(rles, scores, thr=args.mask_nms_thr)
+    return rles, scores[keep], labels[keep]
+
+
+def mask2inst(rle):
+    """Outer contour of one RLE instance, closed, in image coordinates.
+
+    Only the largest contour is kept: an instance is one blob, and the stray
+    interpolation specks the mask head leaves behind would otherwise turn into
+    their own polygons in QuPath.
+    """
+    mask = coco.maskUtils.decode(rle)
+    x, y, w, h = coco.maskUtils.toBbox(rle).astype(int)
+    crop = np.ascontiguousarray(mask[y:y + h + 1, x:x + w + 1])
+    contours = cv2.findContours(crop, cv2.RETR_EXTERNAL,
+                                cv2.CHAIN_APPROX_SIMPLE)[0]
+    if not contours:
+        return None
+    contour = max(contours, key=cv2.contourArea)[:, 0, :]
+    if len(contour) < 3:
+        return None
+    return np.concatenate([contour, contour[[0]]], axis=0) + [x, y]
+
+
+def result_dir(args, img_path):
+    """Where one image's results go, mirroring infer_wsi.py's layout."""
+    img_id = os.path.splitext(os.path.basename(img_path))[0]
+    return f'{args.save_dir}/nuclei/{img_id}'
+
+
+def geojson_path(args, img_path):
+    img_id = os.path.splitext(os.path.basename(img_path))[0]
+    return f'{result_dir(args, img_path)}/{img_id}.geojson'
+
+
+def coco_path(args, img_path):
+    return f'{result_dir(args, img_path)}/coco_nuclei.json'
+
+
+def to_geojson(anns, classes):
+    """QuPath 0.4.4 features for one image: the nucleus outlines.
+
+    The COCO output carries masks as RLE, which QuPath cannot read, so the
+    polygons are traced here from the same annotations. Decoding a full-image
+    RLE per instance is the price of that, which is why it only happens under
+    ``--mode qupath``.
+    """
+    polygons = []
+    for ann in anns:
+        contour = mask2inst(ann['segmentation'])
+        if contour is None:
+            continue
+        label = ann['category_id']
+        polygons.append({
+            'type': 'Feature',
+            'geometry': {
+                'type': 'Polygon',
+                'coordinates': [contour.tolist()],
+            },
+            'properties': {
+                'objectType': 'annotation',
+                'label': int(label),
+                'score': ann['score'],
+                'classification': {
+                    'name': classes[label],
+                    'color': INST_COLORS[label % len(INST_COLORS)],
+                },
+                'isLocked': False,
+            },
+        })
+    return polygons
+
+
+def post_process(result, min_area=10, mask_nms_thr=0.1, margin=0):
+    """Instances kept from one model result: masks, RLEs, scores and labels.
+
+    Drops what min_area rejects and, when margin is set, boxes coming that
+    close to the edge, which on a patch means the nucleus was cut in half.
+    Callers on the patched path want the masks, to place them on the image;
+    the whole-image path wants the RLEs, already in image coordinates.
+    """
+    empty = np.zeros(0, dtype=np.uint8), [], np.zeros(0), np.zeros(0, dtype=np.int32)
+    masks = np.array(mmcv.concat_list(result[1]), dtype=np.uint8)
+    if len(masks) == 0:
+        return empty
+    dets = np.concatenate(result[0])
+    labels = np.concatenate([np.full(bbox.shape[0], i, dtype=np.int32)
+                             for i, bbox in enumerate(result[0])])
+    keep = (masks == 1).sum(axis=(1, 2)) >= min_area
+    if margin:
+        h, w = masks.shape[1:]
+        keep &= ((dets[:, 0] >= margin) & (dets[:, 1] >= margin) &
+                 (dets[:, 2] <= w - margin) & (dets[:, 3] <= h - margin))
+    if not keep.any():
+        return empty
+    masks, dets, labels = masks[keep], dets[keep], labels[keep]
+    rles, idx = mask_nms(masks, dets[:, 4], thr=mask_nms_thr)
+    return masks[idx], rles, dets[idx][:, 4], labels[idx]
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Segment nuclei from images and save to COCO format'
@@ -142,13 +334,23 @@ def parse_args():
         '--output',
         type=str,
         default='nuclei_coco.json',
-        help='Output COCO JSON file path'
+        help='Output COCO JSON file path, holding every image of the run. '
+             'Ignored under --patch, where each image gets its own '
+             'coco_nuclei.json under --save_dir instead'
     )
     parser.add_argument(
         '--score-thr',
         type=float,
         default=0.35,
-        help='Score threshold for detections'
+        help='score threshold, for the --vis-dir drawings only. What enters '
+             'the results is decided by test_cfg.rcnn.score_thr in the config'
+    )
+    parser.add_argument(
+        '--mask-nms-thr',
+        type=float,
+        default=0.1,
+        help='IoU threshold for mask NMS (default: 0.1, set to 1 to disable; '
+             '0 suppresses on any overlap at all)'
     )
     parser.add_argument(
         '--device',
@@ -166,7 +368,9 @@ def parse_args():
         '--batch-size',
         type=int,
         default=16,
-        help='Batch size for processing images (default: 16)'
+        help='Images per forward pass, or patches per forward pass under '
+             '--patch, where images are always handled one at a time '
+             '(default: 16)'
     )
     parser.add_argument(
         '--num-workers',
@@ -187,20 +391,74 @@ def parse_args():
         help='Number of sample images to visualize (default: 10)'
     )
     parser.add_argument(
-        '--mask-nms-thr',
-        type=float,
-        default=0.1,
-        help='IoU threshold for mask NMS (default: 0.1, set to 0 to disable)'
+        '--mode',
+        type=str,
+        default='coco',
+        choices=['coco', 'qupath', 'all'],
+        help='mode of save format. coco writes --output; qupath writes the '
+             'nucleus outlines under --save_dir as tools/infer_wsi.py does'
+    )
+    parser.add_argument(
+        '--save_dir',
+        type=str,
+        default=None,
+        help='directory to save processed data, required by --mode qupath'
+    )
+    parser.add_argument(
+        '--patch',
+        default=False,
+        action='store_true',
+        help='Cut images larger than --patch_size into overlapping patches '
+             'before inference, as tools/infer_wsi.py does. Off by default, '
+             'i.e. each image is segmented whole'
+    )
+    parser.add_argument(
+        '--patch_size',
+        type=int,
+        default=256,
+        help='patch_size'
+    )
+    parser.add_argument(
+        '--step_size',
+        type=int,
+        default=256,
+        help='step_size; the difference from --patch_size is the overlap, '
+             'which is what lets a nucleus cut by one patch be recovered from '
+             'the next'
+    )
+    parser.add_argument(
+        '--margin',
+        type=int,
+        default=0,
+        help='discard the contour which distance is less than margin number '
+             'pixels to edges'
+    )
+    parser.add_argument(
+        '--min_area',
+        type=int,
+        default=10,
+        help='discard the area less than min_area'
     )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    if os.path.exists(args.output):
+    write_coco = args.mode == 'coco' or args.mode == 'all'
+    write_qupath = args.mode == 'qupath' or args.mode == 'all'
+    # where the coco output lands. An image big enough to need patching carries
+    # too many full-image masks to hold every image's worth in memory until the
+    # end, so patching writes one coco json per image, next to its geojson, the
+    # moment that image is done. Without patching the annotations accumulate and
+    # leave as a single merged file at --output
+    split_coco = write_coco and args.patch
+    merged_coco = write_coco and not args.patch
+    if (write_qupath or split_coco) and not args.save_dir:
+        raise ValueError(f"--mode {args.mode} with --patch needs --save_dir")
+    if merged_coco and os.path.exists(args.output):
         print(f"Skipping {args.output}.")
         return
-    
+
     # Load CSV
     print(f"Loading CSV from {args.csv}...")
     df = pd.read_csv(args.csv)
@@ -209,15 +467,23 @@ def main():
         raise ValueError(f"CSV must contain '{args.image_col}' column")
     
     print(f"Found {len(df)} images in CSV")
-    
-    # Randomly sample subset for visualization if requested (from the processed subset)
-    if args.vis_dir and args.vis_samples > 0:
-        num_images = len(df)
-        num_samples = min(args.vis_samples, num_images)
-        df = df.sample(n=num_samples, random_state=None).reset_index(drop=True)
-        print(f"Randomly selected {num_samples} images for visualization: {num_images}")
-    
+
     image_paths = df[args.image_col].tolist()
+    if args.patch:
+        # patching writes every output per image, so a killed run can pick up
+        # where it stopped. An image counts as done once every file its --mode
+        # asks for is there
+        def is_done(p, mode):
+            if mode == 'qupath':
+                return os.path.exists(geojson_path(args, p))
+            elif mode == 'coco':
+                return os.path.exists(coco_path(args, p))
+            else:
+                return os.path.exists(geojson_path(args, p)) and os.path.exists(coco_path(args, p))
+
+        todo = [p for p in image_paths if not is_done(p, args.mode)]
+        print(f'skip {len(image_paths) - len(todo)} images due to existing results')
+        image_paths = todo
     
     # Load model
     print(f"Model Config: {args.config}")
@@ -239,29 +505,34 @@ def main():
                         print(f'SmartResize scale factor set to: {transform["scale_factor"]}')
     
     model = init_detector(cfg, args.checkpoint, device=args.device)
-    MAIN_CLASSES = ('T', 'I', 'C', 'D', 'E')
+    MAIN_CLASSES = ('nucleus',)
     model.CLASSES = MAIN_CLASSES
     
     # Initialize COCO structure
+    categories = [{'id': i, 'name': name, 'supercategory': 'nucleus'}
+                  for i, name in enumerate(MAIN_CLASSES)]
     coco_data = {
         'images': [],
         'annotations': [],
-        'categories': [{
-            'id': 0,
-            'name': 'nucleus',
-            'supercategory': 'nucleus'
-        }]
+        'categories': categories,
     }
+    total_images = 0
+    total_nuclei = 0
     
-    # Create dataset and dataloader
+    # Create dataset and dataloader. Under --patch the batch and the workers
+    # belong to the patches of a single image, as in tools/infer_wsi.py, so the
+    # images themselves are walked one at a time here
     dataset = ImageDataset(image_paths)
-    dataloader = DataLoader(
-        dataset, 
-        batch_size=args.batch_size, 
-        num_workers=args.num_workers,
-        shuffle=False,
-        collate_fn=collate_fn  # Use custom collate function
-    )
+    if args.patch:
+        dataloader = (collate_fn([dataset[i]]) for i in range(len(dataset)))
+    else:
+        dataloader = DataLoader(
+            dataset,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            shuffle=False,
+            collate_fn=collate_fn  # Use custom collate function
+        )
     
     # Process images in batches
     nuclei_id = 1
@@ -271,99 +542,82 @@ def main():
     if args.vis_dir:
         os.makedirs(args.vis_dir, exist_ok=True)
         print(f"Visualization images will be saved to {args.vis_dir}")
+
+    if write_qupath:
+        print(f"QuPath geojson will be saved to {args.save_dir}/nuclei")
     
-    print(f"Processing {len(image_paths)} images in batches of {args.batch_size}...")
-    
-    for batch_idx, batch_data in enumerate(tqdm(dataloader, desc="Processing batches")):
+    print(f"Processing {len(image_paths)} images, "
+          f"{args.batch_size} {'patches' if args.patch else 'images'} at a time...")
+
+    desc = 'Processing images' if args.patch else 'Processing batches'
+    progress = tqdm(dataloader, desc=desc, total=len(image_paths) if args.patch
+                    else None)
+    for batch_idx, batch_data in enumerate(progress):
         try:
             # Unpack batch data - collate_fn returns (images, infos)
             batch_images, batch_infos = batch_data
-            coco_data['images'].extend(batch_infos)
             
-            # Run batch inference (following infer_wsi.py pattern)
-            # Load images for inference
-            results = inference_detector(model, batch_images)
-            seg_mask = [np.array(mmcv.concat_list(tmp_mask[1]), dtype=np.uint8)
-                        for tmp_mask in results]
-            rle_mask = [[] for tmp_mask in results]
+            # under --patch the loop walks one image at a time and args.batch_size
+            # belongs to that image's patches. Without it the whole batch goes
+            # through the model at once. An image smaller than a patch needs no
+            # cutting up either way
+            img = batch_images[0]
+            if args.patch and max(img.shape[:2]) > args.patch_size:
+                outputs = [infer_patch(model, img, args)]
+            else:
+                # margin=0: nothing was cut here, so a nucleus touching the
+                # border is a real one and has to stay
+                det_results = [post_process(res, min_area=args.min_area,
+                                            mask_nms_thr=args.mask_nms_thr, margin=0)
+                               for res in inference_detector(model, batch_images)]
+                outputs = [(rles, scores, labels)
+                           for _, rles, scores, labels in det_results]
 
-            bbox_results = [np.concatenate(tmp_res[0])[:, :4] for tmp_res in results]
-            fg_scores = [np.concatenate(tmp_res[0])[:, 4] for tmp_res in results]
-            labels = [np.concatenate([np.full(bbox.shape[0], i, dtype=np.int32)
-                                      for i, bbox in enumerate(tmp_res[0])])
-                      for tmp_res in results]
-                      
-            for mask_id in range(len(seg_mask)):
-                if len(seg_mask[mask_id]) == 0:
-                    continue
-                # seg_area = (seg_mask[mask_id] == 1).sum(axis=(1, 2))
-                # select_id = (seg_area>=args.min_area)
-                # bbox_results[mask_id] = bbox_results[mask_id][select_id]
-                # seg_mask[mask_id] = seg_mask[mask_id][select_id]
-                # labels[mask_id] = labels[mask_id][select_id]
-                # fg_scores[mask_id] = fg_scores[mask_id][select_id]
-                # if len(seg_mask[mask_id]) == 0:
-                #     continue
-                
-                # Mask NMS
-                tmp_masks, nms_idx = mask_nms(seg_mask[mask_id], fg_scores[mask_id], thr=args.mask_nms_thr)
-                
-                rle_mask[mask_id] = tmp_masks
-                bbox_results[mask_id] = bbox_results[mask_id][nms_idx]
-                seg_mask[mask_id] = seg_mask[mask_id][nms_idx]
-                labels[mask_id] = labels[mask_id][nms_idx]
-                fg_scores[mask_id] = fg_scores[mask_id][nms_idx]
-                
-                image_id = batch_infos[mask_id]['id']
+            for img_info, (rles, scores, labels) in zip(batch_infos, outputs):
                 img_anns = []
-                for i in range(len(seg_mask[mask_id])):
-                    rle_inst = rle_mask[mask_id][i]
-                    rle_inst['counts'] = rle_inst['counts'].decode('ascii')
-                    bbox = coco.maskUtils.toBbox(rle_inst).tolist()
-                    area = bbox[2]*bbox[3]
-                    annt_dict = {
+                for rle, label, score in zip(rles, labels, scores):
+                    area = int(coco.maskUtils.area(rle))
+                    x, y, w, h = coco.maskUtils.toBbox(rle).tolist()
+                    if isinstance(rle['counts'], bytes):
+                        rle['counts'] = rle['counts'].decode('ascii')
+                    img_anns.append({
                         'id': nuclei_id,
-                        'bbox': bbox,
+                        'bbox': [x, y, w, h],
                         'area': area,
-                        'image_id': image_id,
-                        'category_id': int(labels[mask_id][i]),
+                        'image_id': img_info['id'],
+                        'category_id': int(label),
                         'iscrowd': 0,
-                        'segmentation': rle_inst,
-                        'score': float(fg_scores[mask_id][i]),
-                    }
-                    img_anns.append(annt_dict)
+                        'segmentation': rle,
+                        'score': float(score),
+                    })
                     nuclei_id += 1
+                total_images += 1
+                total_nuclei += len(img_anns)
 
-                coco_data['annotations'].extend(img_anns)
+                if write_qupath or split_coco:
+                    os.makedirs(result_dir(args, img_info['img_path']),
+                                exist_ok=True)
+                if write_qupath:
+                    with open(geojson_path(args, img_info['img_path']), 'w') as f:
+                        json.dump(to_geojson(img_anns, model.CLASSES), f)
+                if split_coco:
+                    with open(coco_path(args, img_info['img_path']), 'w') as f:
+                        json.dump({'images': [img_info],
+                                   'annotations': img_anns,
+                                   'categories': categories}, f)
+                elif write_coco:
+                    coco_data['images'].append(img_info)
+                    coco_data['annotations'].extend(img_anns)
 
-                if args.vis_dir and vis_count < args.vis_samples:
-                    img_info = batch_infos[mask_id]
-                    img_path = img_info['img_path']
-                    img = Image.open(img_path).convert('RGB')
+                if img_anns and args.vis_dir and vis_count < args.vis_samples:
+                    img = Image.open(img_info['img_path']).convert('RGB')
                     img_draw = ImageDraw.Draw(img)
-                    
                     for annt in img_anns:
-                        rle_inst = annt['segmentation'].copy()
-                        if isinstance(rle_inst['counts'], bytes):
-                            rle_inst['counts'] = rle_inst['counts'].decode('ascii')
-                        bbox = coco.maskUtils.toBbox(rle_inst).tolist()
-                        # Draw rectangle instead of polygon
-                        x, y, w, h = bbox
+                        if annt['score'] < args.score_thr:
+                            continue
+                        x, y, w, h = annt['bbox']
                         img_draw.rectangle([x, y, x + w, y + h], fill=None, outline='green', width=1)
-                        # Draw probability (score) in top-left corner of each bbox
-                        prob = annt.get('score', None)
-                        if prob is not None:
-                            text = f"{prob:.2f}"
-                            # Use a smaller font size
-                            try:
-                                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
-                            except:
-                                try:
-                                    font = ImageFont.load_default()
-                                except:
-                                    font = None
-                            img_draw.text((x, y), text, fill="black", font=font)
-                    
+                        img_draw.text((x, y), f"{annt['score']:.2f}", fill='black')
                     vis_path = os.path.join(args.vis_dir, f"{vis_count:04d}_{img_info['file_name']}")
                     img.save(vis_path)
                     vis_count += 1
@@ -375,17 +629,17 @@ def main():
             continue
     
     # Save COCO JSON
-    print(f"Saving COCO format to {args.output}...")
-    output_dir = os.path.dirname(args.output)
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
-    with open(f"{args.output}", 'w') as f:
-        json.dump(coco_data, f, indent=2)
+    if merged_coco:
+        print(f"Saving COCO format to {args.output}...")
+        output_dir = os.path.dirname(args.output)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+        with open(f"{args.output}", 'w') as f:
+            json.dump(coco_data, f, indent=2)
 
     print(f"\nDone!")
-    print(f"  Total images processed: {len(coco_data['images'])}")
-    print(f"  Total nuclei: {nuclei_id}")
-    print(f"  Output saved to: {args.output}")
+    print(f"  Total images processed: {total_images}")
+    print(f"  Total nuclei: {total_nuclei}")
 
 
 if __name__ == '__main__':
