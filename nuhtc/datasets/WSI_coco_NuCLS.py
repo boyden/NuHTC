@@ -282,7 +282,7 @@ class NuCLSCocoDataset(WSICocoDataset):
                 #  already filters out anything predicted as ignore_label
                 #  in inference mode, so we only need to do this for gtruth
                 # keep = target['iscrowd'] == 0
-                keep = np.ones(len(target['boxes']), dtype=np.bool)
+                keep = np.ones(len(target['boxes']), dtype=bool)
                 cltrg_boxes = np.int32(target['boxes'][keep])
                 cltrg_labels = np.int32(target['labels'][keep])
                 keep_target, keep_output, _, _ = \
