@@ -705,7 +705,7 @@ class WSICocoDataset(CocoDataset):
         return pairwise_inter, pairwise_union
 
     @staticmethod
-    def mask_nms(masks, pred_scores, thr=0.9, min_area=None):
+    def mask_nms(masks, pred_scores, thr=0.1, min_area=None):
         """https://github.com/cocodataset/cocoapi/blob/8c9bcc3cf640524c4c20a9c40e89cb6a2f2fa0e9/common/maskApi.c#L98
 
         Returns:
