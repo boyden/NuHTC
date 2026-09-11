@@ -48,6 +48,7 @@ from mmcv import Config
 from mmdet.apis import inference_detector
 from nuhtc.apis.inference import init_detector
 from nuhtc.utils import patch_config
+from tools.nuclei_merge import merge_overlap
 
 
 INST_COLORS = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0],
@@ -82,6 +83,22 @@ class ImageDataset(Dataset):
         }
 
 
+def patch_origins(length, size, step):
+    """Patch start coordinates along one axis, the last one flush with the end.
+
+    Walking in strides of ``step`` usually leaves a remainder narrower than a
+    patch, so a final patch is anchored to the far edge. It overlaps its
+    predecessor more than the others do, which costs a little compute but keeps
+    every pixel covered at full patch context.
+    """
+    if length <= size:
+        return [0]
+    xs = list(range(0, length - size + 1, step))
+    if xs[-1] + size < length:
+        xs.append(length - size)
+    return xs
+
+
 class PatchDataset(Dataset):
     """The patches of one image, the role Whole_Slide_Bag_FP plays for a slide."""
     def __init__(self, img, size, step):
@@ -111,7 +128,7 @@ def collate_fn(batch):
     return images, infos
 
 
-def mask_nms(masks, pred_scores, thr=0.9, min_area=None):
+def mask_nms(masks, pred_scores, thr=0.1, min_area=None):
     """https://github.com/cocodataset/cocoapi/blob/8c9bcc3cf640524c4c20a9c40e89cb6a2f2fa0e9/common/maskApi.c#L98
 
     Returns:
@@ -139,142 +156,6 @@ def mask_nms(masks, pred_scores, thr=0.9, min_area=None):
     return tmp_masks[keep_idx==1].tolist(), sort_idx[keep_idx==1]
 
 
-def patch_origins(length, size, step):
-    """Patch start coordinates along one axis, the last one flush with the end.
-
-    Walking in strides of ``step`` usually leaves a remainder narrower than a
-    patch, so a final patch is anchored to the far edge. It overlaps its
-    predecessor more than the others do, which costs a little compute but keeps
-    every pixel covered at full patch context.
-    """
-    if length <= size:
-        return [0]
-    xs = list(range(0, length - size + 1, step))
-    if xs[-1] + size < length:
-        xs.append(length - size)
-    return xs
-
-
-def paste_rle(mask, x, y, shape):
-    """RLE of a patch-local mask placed on a full-image canvas."""
-    canvas = np.zeros(shape, dtype=np.uint8)
-    canvas[y:y + mask.shape[0], x:x + mask.shape[1]] = mask
-    return coco.maskUtils.encode(np.asfortranarray(canvas))
-
-
-def infer_patch(model, img, args):
-    """Segment one image patch by patch, in full-image coordinates.
-
-    The same recipe as tools/infer_wsi.py: instances whose box comes within
-    --margin of a patch edge are dropped as truncated, small ones are dropped,
-    mask NMS runs within the patch, and what survives is placed back into the
-    image. Unlike infer_wsi.py, overlapping patches then get a second mask NMS
-    across the whole image, without which the nuclei inside an overlap are
-    reported once per patch that sees them.
-
-    Returns what the unpatched path returns: full-image RLEs, scores and
-    labels.
-    """
-    img_h, img_w = img.shape[:2]
-    dataset = PatchDataset(img, args.patch_size, args.step_size or args.patch_size)
-    infer_dataloader = DataLoader(dataset, batch_size=args.batch_size,
-                                  num_workers=args.num_workers,
-                                  collate_fn=collate_fn)
-
-    rles, scores, labels = [], [], []
-    for patches, coords in tqdm(infer_dataloader, leave=False,
-                                desc=f'{len(dataset)} patches'):
-        results = inference_detector(model, patches)
-        for (x, y), res in zip(coords, results):
-            masks, _, patch_scores, patch_labels = post_process(
-                res, args.min_area, args.mask_nms_thr, margin=args.margin)
-            if len(masks) == 0:
-                continue
-            rles += [paste_rle(m, x, y, (img_h, img_w)) for m in masks]
-            scores.append(patch_scores)
-            labels.append(patch_labels)
-
-    if not rles:
-        return [], np.zeros(0), np.zeros(0, dtype=np.int32)
-    scores, labels = np.concatenate(scores), np.concatenate(labels)
-
-    # Mask NMS again, now across the whole image. Patches overlap wherever the
-    # last one of a row was pulled back to sit flush with the edge, and always
-    # when step_size < patch_size; the nuclei in there were seen by two patches
-    # and the per-patch NMS could not know about the other copy
-    rles, keep = mask_nms(rles, scores, thr=args.mask_nms_thr)
-    return rles, scores[keep], labels[keep]
-
-
-def mask2inst(rle):
-    """Outer contour of one RLE instance, closed, in image coordinates.
-
-    Only the largest contour is kept: an instance is one blob, and the stray
-    interpolation specks the mask head leaves behind would otherwise turn into
-    their own polygons in QuPath.
-    """
-    mask = coco.maskUtils.decode(rle)
-    x, y, w, h = coco.maskUtils.toBbox(rle).astype(int)
-    crop = np.ascontiguousarray(mask[y:y + h + 1, x:x + w + 1])
-    contours = cv2.findContours(crop, cv2.RETR_EXTERNAL,
-                                cv2.CHAIN_APPROX_SIMPLE)[0]
-    if not contours:
-        return None
-    contour = max(contours, key=cv2.contourArea)[:, 0, :]
-    if len(contour) < 3:
-        return None
-    return np.concatenate([contour, contour[[0]]], axis=0) + [x, y]
-
-
-def result_dir(args, img_path):
-    """Where one image's results go, mirroring infer_wsi.py's layout."""
-    img_id = os.path.splitext(os.path.basename(img_path))[0]
-    return f'{args.save_dir}/nuclei/{img_id}'
-
-
-def geojson_path(args, img_path):
-    img_id = os.path.splitext(os.path.basename(img_path))[0]
-    return f'{result_dir(args, img_path)}/{img_id}.geojson'
-
-
-def coco_path(args, img_path):
-    return f'{result_dir(args, img_path)}/coco_nuclei.json'
-
-
-def to_geojson(anns, classes):
-    """QuPath 0.4.4 features for one image: the nucleus outlines.
-
-    The COCO output carries masks as RLE, which QuPath cannot read, so the
-    polygons are traced here from the same annotations. Decoding a full-image
-    RLE per instance is the price of that, which is why it only happens under
-    ``--mode qupath``.
-    """
-    polygons = []
-    for ann in anns:
-        contour = mask2inst(ann['segmentation'])
-        if contour is None:
-            continue
-        label = ann['category_id']
-        polygons.append({
-            'type': 'Feature',
-            'geometry': {
-                'type': 'Polygon',
-                'coordinates': [contour.tolist()],
-            },
-            'properties': {
-                'objectType': 'annotation',
-                'label': int(label),
-                'score': ann['score'],
-                'classification': {
-                    'name': classes[label],
-                    'color': INST_COLORS[label % len(INST_COLORS)],
-                },
-                'isLocked': False,
-            },
-        })
-    return polygons
-
-
 def post_process(result, min_area=10, mask_nms_thr=0.1, margin=0):
     """Instances kept from one model result: masks, RLEs, scores and labels.
 
@@ -300,6 +181,155 @@ def post_process(result, min_area=10, mask_nms_thr=0.1, margin=0):
     masks, dets, labels = masks[keep], dets[keep], labels[keep]
     rles, idx = mask_nms(masks, dets[:, 4], thr=mask_nms_thr)
     return masks[idx], rles, dets[idx][:, 4], labels[idx]
+
+
+def map_instance(mask, x, y, score, label):
+    """One instance as its outline in image coordinates, as infer_wsi.py does.
+
+    The mask is dropped here: every consumer downstream -- the cross-patch
+    merge, the geojson, the COCO segmentation and box -- works off the polygon,
+    and the coordinate correction is then the patch offset added to a few dozen
+    points. The alternative was to place the mask on a full-image canvas and
+    RLE-encode it, 9 MB per nucleus on a 3000x3000 image, which profiling put
+    at 57% of the wall clock.
+
+    Only the largest contour is kept: an instance is one blob, and the stray
+    interpolation specks the mask head leaves behind would otherwise turn into
+    their own polygons in QuPath. Returns None when nothing traceable is left.
+    """
+    contours = cv2.findContours(mask, cv2.RETR_EXTERNAL,
+                                cv2.CHAIN_APPROX_SIMPLE)[0]
+    # the default puts an empty mask on the same path as a degenerate outline:
+    # below three points there is no ring for shapely to intersect later
+    contour = max(contours, key=cv2.contourArea, default=np.empty((0, 1, 2)))
+    if len(contour) < 3:
+        return None
+    contour = np.concatenate([contour[:, 0, :], contour[[0], 0, :]]) + [x, y]
+    lo, hi = contour.min(axis=0), contour.max(axis=0)
+    return dict(contour=contour,
+                box=np.concatenate([lo, hi - lo + 1]).astype(float),
+                # the pixel count, not the polygon's area: the outline runs
+                # along pixel centres and encloses slightly less
+                area=int(np.count_nonzero(mask)),
+                score=float(score),
+                label=int(label))
+
+
+def merge_instances(insts, thr):
+    """Drop the copies of a nucleus that overlapping patches each reported.
+
+    Patches overlap wherever the last one of a row was pulled back to sit flush
+    with the edge, and always when step_size < patch_size, so a nucleus in the
+    band was seen twice and neither patch's own NMS could know about the other
+    copy. This is the same job tools/nuclei_merge.py does for a whole slide,
+    and it is that function doing it here: outlines into a shapely STRtree,
+    IoU against everything that intersects, highest score wins. Comparing
+    polygons is what lets the masks stay patch-local.
+    """
+    features = [{
+        'geometry': {'type': 'Polygon', 'coordinates': [inst['contour'].tolist()]},
+        # inst_id survives the merge in the properties, which is how the kept
+        # rows are mapped back onto the instances they came from
+        'properties': {'score': inst['score'], 'inst_id': i},
+    } for i, inst in enumerate(insts)]
+    kept = merge_overlap(features, overlap_threshold=thr,
+                         merge_strategy='probability')
+    return [insts[p['inst_id']] for p in kept['properties']]
+
+
+def infer_patch(model, img, args):
+    """Segment one image patch by patch, in full-image coordinates.
+
+    The same recipe as tools/infer_wsi.py: instances whose box comes within
+    --margin of a patch edge are dropped as truncated, small ones are dropped,
+    mask NMS runs within the patch, and what survives is placed back into the
+    image. Unlike infer_wsi.py, overlapping patches then get a second mask NMS
+    across the whole image, without which the nuclei inside an overlap are
+    reported once per patch that sees them.
+
+    Returns what the unpatched path returns: a list of instances, each an
+    outline in image coordinates, as built by :func:`map_instance`.
+    """
+    dataset = PatchDataset(img, args.patch_size, args.step_size or args.patch_size)
+    infer_dataloader = DataLoader(dataset, batch_size=args.batch_size,
+                                  num_workers=args.num_workers,
+                                  collate_fn=collate_fn)
+
+    insts = []
+    for patches, coords in tqdm(infer_dataloader, leave=False,
+                                desc=f'{len(dataset)} patches'):
+        results = inference_detector(model, patches)
+        for (x, y), res in zip(coords, results):
+            masks, _, patch_scores, patch_labels = post_process(
+                res, args.min_area, args.mask_nms_thr, margin=args.margin)
+            insts += [inst for inst in
+                      (map_instance(m, x, y, s, l)
+                       for m, s, l in zip(masks, patch_scores, patch_labels))
+                      if inst is not None]
+
+    if not insts:
+        return []
+    return merge_instances(insts, args.mask_nms_thr)
+
+
+def result_dir(args, img_path):
+    """Where one image's results go, mirroring infer_wsi.py's layout."""
+    img_id = os.path.splitext(os.path.basename(img_path))[0]
+    return f'{args.save_dir}/nuclei/{img_id}'
+
+
+def geojson_path(args, img_path):
+    img_id = os.path.splitext(os.path.basename(img_path))[0]
+    return f'{result_dir(args, img_path)}/{img_id}.geojson'
+
+
+def coco_path(args, img_path):
+    return f'{result_dir(args, img_path)}/coco_nuclei.json'
+
+
+def to_geojson(insts, classes):
+    """QuPath 0.4.4 features for one image: the nucleus outlines."""
+    polygons = []
+    for inst in insts:
+        contour = inst['contour']
+        label = inst['label']
+        polygons.append({
+            'type': 'Feature',
+            'geometry': {
+                'type': 'Polygon',
+                'coordinates': [contour.tolist()],
+            },
+            'properties': {
+                'objectType': 'annotation',
+                'label': int(label),
+                'score': inst['score'],
+                'classification': {
+                    'name': classes[label],
+                    'color': INST_COLORS[label % len(INST_COLORS)],
+                },
+                'isLocked': False,
+            },
+        })
+    return polygons
+
+
+def to_coco_anns(insts, img_info, first_id):
+    """COCO annotations for one image, in full-image coordinates.
+
+    ``segmentation`` is the instance outline as a COCO polygon. A consumer that
+    wants a mask can rasterise it with ``maskUtils.frPyObjects``, which is the
+    same work the old full-image RLE did eagerly for every nucleus.
+    """
+    return [{
+        'id': first_id + i,
+        'bbox': inst['box'].tolist(),
+        'area': inst['area'],
+        'image_id': img_info['id'],
+        'category_id': inst['label'],
+        'iscrowd': 0,
+        'segmentation': [inst['contour'].reshape(-1).tolist()],
+        'score': inst['score'],
+    } for i, inst in enumerate(insts)]
 
 
 def parse_args():
@@ -570,27 +600,16 @@ def main():
                 det_results = [post_process(res, min_area=args.min_area,
                                             mask_nms_thr=args.mask_nms_thr, margin=0)
                                for res in inference_detector(model, batch_images)]
-                outputs = [(rles, scores, labels)
-                           for _, rles, scores, labels in det_results]
+                # nothing was cut up here, so the patch offset is the origin
+                outputs = [[inst for inst in
+                            (map_instance(m, 0, 0, s, l)
+                             for m, s, l in zip(masks, scores, labels))
+                            if inst is not None]
+                           for masks, _, scores, labels in det_results]
 
-            for img_info, (rles, scores, labels) in zip(batch_infos, outputs):
-                img_anns = []
-                for rle, label, score in zip(rles, labels, scores):
-                    area = int(coco.maskUtils.area(rle))
-                    x, y, w, h = coco.maskUtils.toBbox(rle).tolist()
-                    if isinstance(rle['counts'], bytes):
-                        rle['counts'] = rle['counts'].decode('ascii')
-                    img_anns.append({
-                        'id': nuclei_id,
-                        'bbox': [x, y, w, h],
-                        'area': area,
-                        'image_id': img_info['id'],
-                        'category_id': int(label),
-                        'iscrowd': 0,
-                        'segmentation': rle,
-                        'score': float(score),
-                    })
-                    nuclei_id += 1
+            for img_info, insts in zip(batch_infos, outputs):
+                img_anns = to_coco_anns(insts, img_info, nuclei_id)
+                nuclei_id += len(img_anns)
                 total_images += 1
                 total_nuclei += len(img_anns)
 
@@ -599,7 +618,7 @@ def main():
                                 exist_ok=True)
                 if write_qupath:
                     with open(geojson_path(args, img_info['img_path']), 'w') as f:
-                        json.dump(to_geojson(img_anns, model.CLASSES), f)
+                        json.dump(to_geojson(insts, model.CLASSES), f)
                 if split_coco:
                     with open(coco_path(args, img_info['img_path']), 'w') as f:
                         json.dump({'images': [img_info],

@@ -7,7 +7,7 @@ import scipy
 from scipy.optimize import linear_sum_assignment
 from pycocotools import mask as maskUtils
 
-def mask_nms(masks, pred_scores, thr=0.9):
+def mask_nms(masks, pred_scores, thr=0.1):
     """https://github.com/cocodataset/cocoapi/blob/8c9bcc3cf640524c4c20a9c40e89cb6a2f2fa0e9/common/maskApi.c#L98
 
     Returns:
