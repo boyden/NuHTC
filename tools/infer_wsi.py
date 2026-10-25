@@ -419,6 +419,9 @@ def main():
         if test_pipe['type'] == 'MultiScaleFlipAug':
             test_pipe['scale_factor'] = float(80/args.mag)
             print('scale_factor: ', test_pipe['scale_factor'])
+            for t in test_pipe['transforms']:
+                if t['type'] == 'Normalize':
+                    t['to_rgb'] = False  # openslide tiles are already RGB
 
     # build the model from a config file and a checkpoint file
     model = init_detector(cfg, args.checkpoint, device=args.device)
