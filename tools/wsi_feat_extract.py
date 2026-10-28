@@ -1,4 +1,4 @@
-import glob, sys, os, time, json
+import glob, sys, os, time, json, gc, multiprocessing
 import cv2
 import openslide
 import sqlite3
@@ -14,7 +14,7 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from histomicstk.features.compute_nuclei_features import compute_nuclei_features
 from histomicstk.preprocessing.color_deconvolution import color_deconvolution_routine
-from multiprocessing import Pool
+from concurrent.futures import ProcessPoolExecutor
 
 warnings.filterwarnings('ignore')
 
@@ -140,6 +140,10 @@ def extract_feat(datadir, segdir,
     else:
         slide_id_li = slide_id_li[start:]
     
+    # one pool for the whole run; forkserver workers come from a clean server process, not from this one holding the
+    # slide's geojson. Unlike multiprocessing.Pool, which hangs when a worker is killed (e.g. OOM), it raises
+    # BrokenProcessPool
+    pool = ProcessPoolExecutor(num_workers, mp_context=multiprocessing.get_context('forkserver'))
     for idx, slide_id in enumerate(slide_id_li):
         print(f'\n[{idx+1}/{len(slide_id_li)}]process: {slide_id}')
         nu_file_path = f'{segdir}/{slide_id}/{slide_id}_merged.geojson'
@@ -186,6 +190,9 @@ def extract_feat(datadir, segdir,
 
         coord_li = [np.array(elem['geometry']['coordinates'][0]) for elem in nu_geojson]
 
+        # keep the gc of the forked DataLoader workers off the slide's geojson objects, which would otherwise be
+        # copied into every worker (copy-on-write): job peak ~55 -> ~16 MB per MB of merged geojson
+        gc.freeze()
         wsi = openslide.open_slide(f'{datadir}/{slide_id}.svs')
         nu_dataset = WSI_Crop(wsi, coord_li, mag=mag)
         nu_dataloader = DataLoader(nu_dataset, batch_size=bs_size, 
@@ -207,8 +214,7 @@ def extract_feat(datadir, segdir,
                 nu_info['x_max'] = nu_batches['x_max'][nu_idx]
                 nu_info['y_max'] = nu_batches['y_max'][nu_idx]
 
-            with Pool(num_workers) as pool:
-                results = pool.starmap(process_nuclei_batch, [(nu_img_li[i], nu_mask_li[i], nu_geojson_li[i]) for i in range(len(nu_img_li))])
+            results = list(pool.map(process_nuclei_batch, nu_img_li, nu_mask_li, nu_geojson_li))
 
             fdf_li = [res for res in results if res is not None]
             if len(fdf_li) == 0:

@@ -15,6 +15,7 @@ Note: Boundary/margin cells already removed, input to merge_overlap() is cleaned
 @output processed geojson file
 '''
 
+import gc
 import os
 import sys
 import time
@@ -83,25 +84,29 @@ def merge_overlap(cleaned_edge_cells: pd.DataFrame, overlap_threshold=0.01, merg
 
     print('Starting overlap removal...')
     batch_size = 20480
-    worker_count = 16
+    worker_count = len(os.sched_getaffinity(0))  # the CPUs the job was given
     for iteration in range(1):
         print(f'Iteration {iteration}')
 
         num_batches = (len(merged_cells) + batch_size - 1) // batch_size
 
         poly_list, poly_uid_map, uid_poly_map = [], {}, {}
-        for i in tqdm(range(num_batches)):
-            batch_df = merged_cells.iloc[i * batch_size : (i + 1) * batch_size]
-            indices = np.array_split(range(len(batch_df)), worker_count)
-            split_batches = [batch_df.iloc[idx] for idx in indices]
-            with Pool(processes=worker_count) as pool:
+        # One pool, forked once; gc.freeze() keeps the workers' GC from touching (and so copying) the parent's
+        # objects, which otherwise charges the job one copy of the whole slide per worker.
+        gc.freeze()
+        with Pool(processes=worker_count) as pool:
+            for i in tqdm(range(num_batches)):
+                batch_df = merged_cells.iloc[i * batch_size : (i + 1) * batch_size]
+                indices = np.array_split(range(len(batch_df)), worker_count)
+                split_batches = [batch_df.iloc[idx] for idx in indices]
                 batch_result = pool.map(process_batch, split_batches)
-    
-            for result in batch_result:
-                for idx, poly in result:
-                    poly_list.append(poly)
-                    poly_uid_map[poly] = idx
-                    uid_poly_map[idx] = poly
+
+                for result in batch_result:
+                    for idx, poly in result:
+                        poly_list.append(poly)
+                        poly_uid_map[poly] = idx
+                        uid_poly_map[idx] = poly
+        gc.unfreeze()
 
         # Use an strtree for fast querying
         tree = strtree.STRtree(poly_list)

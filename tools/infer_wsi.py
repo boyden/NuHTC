@@ -489,7 +489,8 @@ def main():
         for idx, data in enumerate(tqdm(infer_dataloader)):
             img = data[0]
             img = [elem.numpy() for elem in img]
-            coord = data[1].numpy()
+            # copy: a view would keep the worker's shared-memory tensor, and with it one open fd, alive per batch
+            coord = data[1].numpy().copy()
             coords.append(coord)
             # img = glob.glob(f'{args.save_dir}/{slide_id}/img/img*.png')
             # img.sort()
